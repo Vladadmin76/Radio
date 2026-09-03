@@ -68,11 +68,6 @@ html, body {
 }
 .genre-card img { width: 100%; height: 100%; object-fit: contain; display:block; transform: scale(0.92); }
 .genre-card:active { transform: scale(0.94); }
-.genre-card .count-badge {
-  position: absolute; bottom: 3px; right: 5px;
-  font-size: 9px; background: rgba(58,53,44,0.75); color: #f4f0e6;
-  padding: 1px 5px; border-radius: 8px;
-}
 .empty-hint {
   padding: 40px 20px; text-align: center; color: #8a8168; font-size: 13px; line-height: 1.6;
 }
@@ -171,11 +166,6 @@ html, body {
 
     <!-- GENRES SCREEN -->
     <div id="screen-genres" class="screen" style="display:flex;">
-      <div class="screen-header">
-        <span class="screen-title">GENRES</span>
-        <span id="btn-filter-hint" style="font-size:11px;color:#8a8168;cursor:pointer;">▽ filter</span>
-        <span id="nav-to-favorites" style="font-size:18px;cursor:pointer;">☆ ⇄</span>
-      </div>
       <div id="grid-scroll-genres" class="grid-scroll"></div>
     </div>
 
@@ -377,7 +367,7 @@ function renderGenreGrid(screenName) {
     const g = GENRES[slug];
     const card = document.createElement('div');
     card.className = 'genre-card';
-    card.innerHTML = `<img src="${g.img}" alt="${g.label}" draggable="false"><span class="count-badge">${counts[slug]}</span>`;
+    card.innerHTML = `<img src="${g.img}" alt="${g.label}" draggable="false">`;
     card.addEventListener('click', () => openStationList(slug, screenName));
     grid.appendChild(card);
   }
@@ -567,8 +557,9 @@ function attachSwipe(el, handlers) {
     if (!tracking) return; tracking = false;
     const t = e.changedTouches[0];
     const dx = t.clientX - sx, dy = t.clientY - sy;
+    const startedNearTop = sy < window.innerHeight * 0.15;
     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) handlers.horizontal && handlers.horizontal(dx > 0 ? 'right' : 'left');
-    else if (dy > 55 && Math.abs(dy) > Math.abs(dx)) handlers.down && handlers.down();
+    else if (dy > 55 && Math.abs(dy) > Math.abs(dx) && startedNearTop) handlers.down && handlers.down();
     else if (dy < -55 && Math.abs(dy) > Math.abs(dx)) handlers.up && handlers.up();
   }, { passive: true });
 }
@@ -585,8 +576,6 @@ function initStaticImages() {
 
 function init() {
   initStaticImages();
-  document.getElementById('btn-filter-hint').addEventListener('click', openFilter);
-  document.getElementById('nav-to-favorites').addEventListener('click', () => goToScreen('favorites'));
   document.getElementById('nav-to-genres').addEventListener('click', () => goToScreen('genres'));
   document.getElementById('filter-close').addEventListener('click', closeFilter);
   document.getElementById('filter-apply').addEventListener('click', applyFilter);
