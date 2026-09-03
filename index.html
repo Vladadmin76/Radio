@@ -92,7 +92,7 @@ html, body {
 .filter-panel.open { transform: translateY(0); }
 .filter-head { padding: 12px 16px 6px; font-weight: bold; font-size: 13px; letter-spacing: 0.05em; }
 .filter-list { overflow-y: auto; padding: 4px 16px; flex: 1; }
-.filter-item { display:flex; align-items:center; gap: 10px; padding: 7px 0; font-size: 13px; border-bottom: 1px dashed #d8d0ba; }
+.filter-item { display:flex; align-items:center; gap: 10px; padding: 7px 0; font-size: 26px; color: #000; border-bottom: 1px dashed #d8d0ba; }
 .filter-item input { width: 16px; height: 16px; }
 .filter-actions { display:flex; gap: 10px; padding: 10px 16px 16px; }
 .filter-actions button {
@@ -122,7 +122,7 @@ html, body {
 }
 .cassette-wrap img.cassette-bg { width: 100%; display: block; }
 .cassette-genre {
-  position: absolute; left: 5%; top: 36%; width: 11%;
+  position: absolute; left: 8%; top: 36%; width: 11%;
   aspect-ratio: 10 / 7;
   border-radius: 3px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
@@ -607,7 +607,6 @@ function init() {
 
   attachSwipe(document.getElementById('screen-genres'), { horizontal: () => goToScreen('favorites'), down: openFilter });
   attachSwipe(document.getElementById('screen-favorites'), { horizontal: () => goToScreen('genres') });
-  attachSwipe(document.getElementById('filter-panel'), { up: closeFilter });
   attachSwipe(document.getElementById('screen-player'), { horizontal: exitPlayer });
 
   goToScreen('genres');
