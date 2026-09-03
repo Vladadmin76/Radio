@@ -529,7 +529,6 @@ function goToScreen(name) {
 
 function exitList() { goToScreen(state.listContext.sourceScreen); }
 function exitPlayer() {
-  audioEl.pause();
   goToScreen('list');
   renderStationList();
 }
