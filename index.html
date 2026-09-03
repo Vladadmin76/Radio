@@ -483,12 +483,12 @@ audioEl.addEventListener('play', updatePlayPauseIcon);
 ['error','stalled'].forEach(evt => audioEl.addEventListener(evt, silentReconnect));
 
 function silentReconnect() {
-  if (!state.player) return;
+  if (!state.player || audioEl.paused) return;
   clearTimeout(state.reconnectTimer);
   if (state.reconnectAttempts > 8) return;
   state.reconnectAttempts++;
   state.reconnectTimer = setTimeout(() => {
-    if (!state.player) return;
+    if (!state.player || audioEl.paused) return;
     const s = state.player.station;
     audioEl.src = s.url_resolved || s.url;
     audioEl.play().catch(() => {});
@@ -497,7 +497,7 @@ function silentReconnect() {
 
 function togglePlayPause() {
   if (audioEl.paused) audioEl.play().catch(()=>{});
-  else audioEl.pause();
+  else { clearTimeout(state.reconnectTimer); audioEl.pause(); }
 }
 
 function playAdjacent(delta) {
