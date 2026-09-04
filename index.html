@@ -423,10 +423,11 @@ function findVariants(station) {
 function startPlayback(index) {
   const ctx = state.listContext;
   const station = ctx.stations[index];
+  const alreadyPlaying = state.player && state.player.station.stationuuid === station.stationuuid && !audioEl.paused;
   state.player = { station, list: ctx.stations, index, variants: findVariants(station) };
   renderPlayer();
   goToScreen('player');
-  playStation(station);
+  if (!alreadyPlaying) playStation(station);
 }
 
 function renderPlayer() {
