@@ -430,7 +430,7 @@ function renderStationList() {
 const audioEl = new Audio();
 
 function findVariants(station) {
-  const pool = state.listContext ? state.listContext.stations : state.pool;
+  const pool = state.pool.concat(state.favorites);
   const sameName = pool.filter(s => s.name.trim().toLowerCase() === station.name.trim().toLowerCase());
   const map = new Map();
   for (const s of sameName) {
