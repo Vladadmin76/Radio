@@ -403,7 +403,15 @@ function renderGenreGrid(screenName) {
 /* ============ station list ============ */
 function openStationList(slug, sourceScreen) {
   const source = sourceScreen === 'genres' ? state.pool : state.favorites;
-  const stations = source.filter(st => stationGenres(st).includes(slug)).sort((a,b) => (b.votes||0) - (a.votes||0));
+  const filtered = source.filter(st => stationGenres(st).includes(slug)).sort((a,b) => (b.votes||0) - (a.votes||0));
+  const seenNames = new Set();
+  const stations = [];
+  for (const st of filtered) {
+    const key = st.name.trim().toLowerCase();
+    if (seenNames.has(key)) continue;
+    seenNames.add(key);
+    stations.push(st);
+  }
   state.listContext = { title: GENRES[slug].label, slug, stations, sourceScreen };
   renderStationList();
   goToScreen('list');
