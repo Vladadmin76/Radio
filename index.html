@@ -299,16 +299,28 @@ function normalize(s) {
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+function dedupeByName(stations) {
+  const sorted = stations.slice().sort((a, b) => (b.votes || 0) - (a.votes || 0));
+  const seen = new Set();
+  const out = [];
+  for (const s of sorted) {
+    const key = s.name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
 function loadFavorites() {
-  try { const raw = localStorage.getItem(FAV_KEY); return raw ? JSON.parse(raw) : []; }
+  try { const raw = localStorage.getItem(FAV_KEY); return dedupeByName(raw ? JSON.parse(raw) : []); }
   catch (e) { return []; }
 }
 function saveFavorites() {
   try { localStorage.setItem(FAV_KEY, JSON.stringify(state.favorites)); } catch (e) {}
 }
-function isFavorite(station) { return state.favorites.some(f => f.stationuuid === station.stationuuid); }
+function isFavorite(station) { return state.favorites.some(f => f.name.trim().toLowerCase() === station.name.trim().toLowerCase()); }
 function addFavorite(station) { if (!isFavorite(station)) { state.favorites.push(station); saveFavorites(); } }
-function removeFavorite(station) { state.favorites = state.favorites.filter(f => f.stationuuid !== station.stationuuid); saveFavorites(); }
+function removeFavorite(station) { state.favorites = state.favorites.filter(f => f.name.trim().toLowerCase() !== station.name.trim().toLowerCase()); saveFavorites(); }
 
 function stationGenres(station) {
   const tagNorm = normalize((station.tags || '').replace(/,/g, ' '));
@@ -403,15 +415,8 @@ function renderGenreGrid(screenName) {
 /* ============ station list ============ */
 function openStationList(slug, sourceScreen) {
   const source = sourceScreen === 'genres' ? state.pool : state.favorites;
-  const filtered = source.filter(st => stationGenres(st).includes(slug)).sort((a,b) => (b.votes||0) - (a.votes||0));
-  const seenNames = new Set();
-  const stations = [];
-  for (const st of filtered) {
-    const key = st.name.trim().toLowerCase();
-    if (seenNames.has(key)) continue;
-    seenNames.add(key);
-    stations.push(st);
-  }
+  const filtered = source.filter(st => stationGenres(st).includes(slug));
+  const stations = dedupeByName(filtered);
   state.listContext = { title: GENRES[slug].label, slug, stations, sourceScreen };
   renderStationList();
   goToScreen('list');
