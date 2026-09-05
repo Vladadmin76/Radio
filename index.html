@@ -188,16 +188,6 @@ html, body {
       <div id="grid-scroll-genres" class="grid-scroll"></div>
     </div>
 
-    <!-- FAVORITES SCREEN -->
-    <div id="screen-favorites" class="screen" style="display:none;">
-      <div class="screen-header">
-        <span id="nav-to-genres" style="font-size:27px;cursor:pointer;">⇄ ♪</span>
-        <span class="screen-title">FAVORITES</span>
-        <span style="width:10px;"></span>
-      </div>
-      <div id="grid-scroll-favorites" class="grid-scroll"></div>
-    </div>
-
     <!-- STATION LIST SCREEN -->
     <div id="screen-list" class="screen" style="display:none;">
       <div class="screen-header">
@@ -282,7 +272,7 @@ const state = {
   pool: [],
   favorites: loadFavorites(),
   selectedLanguages: [],
-  screen: 'genres',            // genres | favorites | list | player
+  screen: 'genres',            // genres | list | player
   listContext: null,           // { title, slug, stations, sourceScreen }
   player: null,                // { station, list, index, variants }
   reconnectTimer: null,
@@ -375,27 +365,23 @@ async function loadPool() {
   } catch (e) {
     state.pool = [];
   }
-  renderGenreGrid('genres');
+  renderGenreGrid();
 }
 
 /* ============ genre grid rendering ============ */
-function genreCountsForScreen(screenName) {
+function genreCountsForScreen() {
   const counts = {};
-  const source = screenName === 'genres' ? state.pool : state.favorites;
-  for (const st of source) for (const g of stationGenres(st)) counts[g] = (counts[g]||0) + 1;
+  for (const st of state.pool) for (const g of stationGenres(st)) counts[g] = (counts[g]||0) + 1;
   return counts;
 }
 
-function renderGenreGrid(screenName) {
-  const containerId = screenName === 'genres' ? 'grid-scroll-genres' : 'grid-scroll-favorites';
-  const container = document.getElementById(containerId);
-  const counts = genreCountsForScreen(screenName);
+function renderGenreGrid() {
+  const container = document.getElementById('grid-scroll-genres');
+  const counts = genreCountsForScreen();
   const activeSlugs = GENRE_ORDER.filter(s => counts[s] > 0);
 
   if (activeSlugs.length === 0) {
-    container.innerHTML = `<div class="empty-hint">${
-      screenName === 'genres' ? 'No stations found for this filter yet.' : 'No favorites yet.\nOpen a genre and tap the star to add one.'
-    }</div>`;
+    container.innerHTML = `<div class="empty-hint">No stations found for this filter yet.</div>`;
     return;
   }
   const grid = document.createElement('div');
@@ -405,7 +391,7 @@ function renderGenreGrid(screenName) {
     const card = document.createElement('div');
     card.className = 'genre-card';
     card.innerHTML = `<img src="${g.img}" alt="${g.label}" draggable="false">`;
-    card.addEventListener('click', () => openStationList(slug, screenName));
+    card.addEventListener('click', () => openStationList(slug));
     grid.appendChild(card);
   }
   container.innerHTML = '';
@@ -413,11 +399,17 @@ function renderGenreGrid(screenName) {
 }
 
 /* ============ station list ============ */
-function openStationList(slug, sourceScreen) {
-  const source = sourceScreen === 'genres' ? state.pool : state.favorites;
-  const filtered = source.filter(st => stationGenres(st).includes(slug));
+function openStationList(slug) {
+  const filtered = state.pool.filter(st => stationGenres(st).includes(slug));
   const stations = dedupeByName(filtered);
-  state.listContext = { title: GENRES[slug].label, slug, stations, sourceScreen };
+  state.listContext = { title: GENRES[slug].label, slug, stations, sourceScreen: 'genres' };
+  renderStationList();
+  goToScreen('list');
+}
+
+function openFavoritesList() {
+  const stations = dedupeByName(state.favorites).sort((a, b) => (b.votes || 0) - (a.votes || 0));
+  state.listContext = { title: 'FAVORITES', slug: null, stations, sourceScreen: 'genres' };
   renderStationList();
   goToScreen('list');
 }
@@ -427,6 +419,10 @@ function renderStationList() {
   document.getElementById('station-list-title').textContent = ctx.title;
   const el = document.getElementById('station-list');
   el.innerHTML = '';
+  if (ctx.stations.length === 0) {
+    el.innerHTML = `<div class="empty-hint">No favorites yet.\nOpen a genre and tap the star to add one.</div>`;
+    return;
+  }
   ctx.stations.forEach((st, idx) => {
     const row = document.createElement('div');
     row.className = 'station-row';
@@ -564,10 +560,8 @@ function playAdjacent(delta) {
 function goToScreen(name) {
   state.screen = name;
   document.getElementById('screen-genres').style.display = name === 'genres' ? 'flex' : 'none';
-  document.getElementById('screen-favorites').style.display = name === 'favorites' ? 'flex' : 'none';
   document.getElementById('screen-list').style.display = name === 'list' ? 'flex' : 'none';
   document.getElementById('screen-player').style.display = name === 'player' ? 'flex' : 'none';
-  if (name === 'favorites') renderGenreGrid('favorites');
 }
 
 function exitList() { goToScreen(state.listContext.sourceScreen); }
@@ -629,7 +623,6 @@ function initStaticImages() {
 
 function init() {
   initStaticImages();
-  document.getElementById('nav-to-genres').addEventListener('click', () => goToScreen('genres'));
   document.getElementById('filter-close').addEventListener('click', closeFilter);
   document.getElementById('filter-apply').addEventListener('click', applyFilter);
   document.getElementById('filter-reset').addEventListener('click', resetFilter);
@@ -649,8 +642,7 @@ function init() {
     if (!wrap.contains(e.target)) document.getElementById('cassette-quality-menu').classList.remove('open');
   });
 
-  attachSwipe(document.getElementById('screen-genres'), { horizontal: () => goToScreen('favorites'), down: openFilter });
-  attachSwipe(document.getElementById('screen-favorites'), { horizontal: () => goToScreen('genres') });
+  attachSwipe(document.getElementById('screen-genres'), { horizontal: openFavoritesList, down: openFilter });
   attachSwipe(document.getElementById('screen-player'), { horizontal: exitPlayer });
 
   goToScreen('genres');
