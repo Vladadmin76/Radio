@@ -438,6 +438,18 @@ function renderStationList() {
 /* ============ player ============ */
 const audioEl = new Audio();
 
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('play', () => audioEl.play().catch(() => {}));
+  navigator.mediaSession.setActionHandler('pause', () => { clearTimeout(state.reconnectTimer); audioEl.pause(); });
+  navigator.mediaSession.setActionHandler('previoustrack', () => playAdjacent(-1));
+  navigator.mediaSession.setActionHandler('nexttrack', () => playAdjacent(1));
+}
+
+function updateMediaSessionMetadata(station) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({ title: station.name, artist: 'Retro Radio' });
+}
+
 function findVariants(station) {
   const pool = state.pool.concat(state.favorites);
   const sameName = pool.filter(s => s.name.trim().toLowerCase() === station.name.trim().toLowerCase());
@@ -518,11 +530,12 @@ function playStation(station) {
   audioEl.load();
   audioEl.play().catch(() => {});
   updatePlayPauseIcon();
+  updateMediaSessionMetadata(station);
 }
 
 audioEl.addEventListener('playing', () => { state.reconnectAttempts = 0; updatePlayPauseIcon(); });
-audioEl.addEventListener('pause', updatePlayPauseIcon);
-audioEl.addEventListener('play', updatePlayPauseIcon);
+audioEl.addEventListener('pause', () => { updatePlayPauseIcon(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; });
+audioEl.addEventListener('play', () => { updatePlayPauseIcon(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
 ['error','stalled'].forEach(evt => audioEl.addEventListener(evt, silentReconnect));
 
 function silentReconnect() {
