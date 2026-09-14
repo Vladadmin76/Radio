@@ -266,6 +266,8 @@ const MIRRORS = [
 ];
 const FAV_KEY = 'retroRadioFavorites_v1';
 const POOL_LIMIT = 3000;
+const POOL_CACHE_KEY = 'retroRadioPoolCache_v1';
+const POOL_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 /* ============ state ============ */
 const state = {
@@ -344,9 +346,29 @@ async function loadLanguageList() {
   } catch (e) { return []; }
 }
 
+function poolCacheKey() { return state.selectedLanguages.slice().sort().join(','); }
+function loadPoolCache() {
+  try { const raw = localStorage.getItem(POOL_CACHE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function savePoolCache(key, stations) {
+  try { localStorage.setItem(POOL_CACHE_KEY, JSON.stringify({ ts: Date.now(), key, stations })); }
+  catch (e) {}
+}
+
 async function loadPool() {
   const el = document.getElementById('grid-scroll-genres');
-  el.innerHTML = '<div class="empty-hint">Loading stations…</div>';
+  const key = poolCacheKey();
+  const cached = loadPoolCache();
+  const hasFreshCache = cached && cached.key === key && (Date.now() - cached.ts) < POOL_CACHE_MAX_AGE_MS;
+
+  if (hasFreshCache) {
+    state.pool = cached.stations;
+    renderGenreGrid();
+  } else {
+    el.innerHTML = '<div class="empty-hint">Loading stations…</div>';
+  }
+
   try {
     let stations = [];
     if (state.selectedLanguages.length === 0) {
@@ -362,8 +384,9 @@ async function loadPool() {
       stations.sort((a,b) => (b.votes||0) - (a.votes||0));
     }
     state.pool = stations;
+    savePoolCache(key, stations);
   } catch (e) {
-    state.pool = [];
+    if (!hasFreshCache) state.pool = [];
   }
   renderGenreGrid();
 }
