@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Retro Radio</title>
 <style>
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 html, body {
   margin: 0; padding: 0; height: 100%; overflow: hidden;
   background: #eae3d3;
@@ -278,7 +278,8 @@ const state = {
   listContext: null,           // { title, slug, stations, sourceScreen }
   player: null,                // { station, list, index, variants }
   reconnectTimer: null,
-  reconnectAttempts: 0
+  reconnectAttempts: 0,
+  stallGraceTimer: null
 };
 
 /* ============ helpers ============ */
@@ -547,6 +548,8 @@ function updatePlayPauseIcon() {
 
 function playStation(station) {
   clearTimeout(state.reconnectTimer);
+  clearTimeout(state.stallGraceTimer);
+  state.stallGraceTimer = null;
   state.reconnectAttempts = 0;
   audioEl.pause();
   audioEl.src = station.url_resolved || station.url;
@@ -556,14 +559,28 @@ function playStation(station) {
   updateMediaSessionMetadata(station);
 }
 
-audioEl.addEventListener('playing', () => { state.reconnectAttempts = 0; updatePlayPauseIcon(); });
+audioEl.addEventListener('playing', () => {
+  state.reconnectAttempts = 0;
+  clearTimeout(state.stallGraceTimer);
+  state.stallGraceTimer = null;
+  updatePlayPauseIcon();
+});
 audioEl.addEventListener('pause', () => { updatePlayPauseIcon(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; });
 audioEl.addEventListener('play', () => { updatePlayPauseIcon(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
-['error','stalled'].forEach(evt => audioEl.addEventListener(evt, silentReconnect));
+audioEl.addEventListener('error', silentReconnect);
+audioEl.addEventListener('stalled', () => {
+  if (!state.player || audioEl.paused || state.stallGraceTimer) return;
+  state.stallGraceTimer = setTimeout(() => {
+    state.stallGraceTimer = null;
+    silentReconnect();
+  }, 4000);
+});
 
 function silentReconnect() {
   if (!state.player || audioEl.paused) return;
   clearTimeout(state.reconnectTimer);
+  clearTimeout(state.stallGraceTimer);
+  state.stallGraceTimer = null;
   if (state.reconnectAttempts > 8) return;
   state.reconnectAttempts++;
   state.reconnectTimer = setTimeout(() => {
@@ -576,7 +593,12 @@ function silentReconnect() {
 
 function togglePlayPause() {
   if (audioEl.paused) audioEl.play().catch(()=>{});
-  else { clearTimeout(state.reconnectTimer); audioEl.pause(); }
+  else {
+    clearTimeout(state.reconnectTimer);
+    clearTimeout(state.stallGraceTimer);
+    state.stallGraceTimer = null;
+    audioEl.pause();
+  }
 }
 
 function playAdjacent(delta) {
