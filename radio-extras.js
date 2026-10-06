@@ -1,4 +1,4 @@
-/* Retro Radio additions: visible controls, grouped genres, now playing, failover. */
+/* Retro Radio additions. Card size is set here so a stale layout file cannot leave the last row short. */
 (function () {
   const RECENT_KEY = 'retroRadioRecent_v1';
   const HINT_KEY = 'retroRadioHintSeen_v1';
@@ -15,16 +15,20 @@
     { slug: 'world', label: 'World', img: 'assets/genres/world.webp', members: ['world','afrobeat','reggae','dub','dancehall','ska','rocksteady','latin','salsa','merengue','bachata','tango','flamenco','bossa-nova','samba','forro','zouk','kizomba','afro-cuban','bhangra','bollywood'] },
     { slug: 'soundtrack', label: 'Soundtrack', img: 'assets/genres/soundtrack.webp', members: ['soundtrack','game-music','anison'] },
     { slug: 'spoken', label: 'Spoken', img: 'assets/genres/spoken-word.webp', members: ['spoken-word','comedy','podcast','audiobook','narration','acapella','field-recording','experimental'] },
-    { slug: 'other', label: 'Other', img: 'assets/genres/world.webp', members: [] }
+    { slug: 'other', label: 'Other', img: 'assets/genres/other.webp', members: [] }
   ];
   const GROUP_BY_MEMBER = {};
   GENRE_GROUPS.forEach(g => g.members.forEach(m => { GROUP_BY_MEMBER[m] = g.slug; }));
   function groupBySlug(slug) { return GENRE_GROUPS.find(g => g.slug === slug) || GENRE_GROUPS[GENRE_GROUPS.length - 1]; }
-
   const style = document.createElement('style');
-  style.textContent = '.genre-toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px 0;flex-shrink:0}.genre-toolbar button,.list-extra button{border:2px solid #3a352c;background:#f4f0e6;color:#3a352c;font-family:inherit;font-weight:bold;font-size:12px;letter-spacing:.04em;border-radius:4px;padding:8px 10px;cursor:pointer}.genre-toolbar input{flex:1;min-width:0;border:2px solid #3a352c;background:#fbfaf5;font-family:inherit;font-size:16px;padding:8px 10px;border-radius:4px;color:#3a352c}.recent-row{display:flex;gap:8px;overflow-x:auto;padding:8px 10px 0}.recent-chip{flex:0 0 auto;border:1px dashed #8a8168;background:#f4f0e6;color:#3a352c;font-family:inherit;font-size:13px;font-weight:bold;padding:8px 10px;border-radius:4px;cursor:pointer}.hint-overlay{position:absolute;inset:0;z-index:40;background:rgba(58,53,44,.45);display:flex;align-items:flex-end;justify-content:center;padding:18px}.hint-card{background:#fbfaf5;border:2px solid #3a352c;border-radius:8px;padding:16px;max-width:420px;font-size:16px;line-height:1.45}.hint-card button{margin-top:12px;width:100%}';
+  style.textContent = '.genre-toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px 0;flex-shrink:0}.genre-toolbar button,.list-extra button{border:2px solid #3a352c;background:#f4f0e6;color:#3a352c;font-family:inherit;font-weight:bold;font-size:12px;letter-spacing:.04em;border-radius:4px;padding:8px 10px;cursor:pointer}.genre-toolbar input{flex:1;min-width:0;border:2px solid #3a352c;background:#fbfaf5;font-family:inherit;font-size:16px;padding:8px 10px;border-radius:4px;color:#3a352c}.recent-row{display:flex;gap:8px;overflow-x:auto;padding:8px 10px 0}.recent-chip{flex:0 0 auto;border:1px dashed #8a8168;background:#f4f0e6;color:#3a352c;font-family:inherit;font-size:13px;font-weight:bold;padding:8px 10px;border-radius:4px;cursor:pointer}.hint-overlay{position:absolute;inset:0;z-index:40;background:rgba(58,53,44,.45);display:flex;align-items:flex-end;justify-content:center;padding:18px}.hint-card{background:#fbfaf5;border:2px solid #3a352c;border-radius:8px;padding:16px;max-width:420px;font-size:16px;line-height:1.45}.hint-card button{margin-top:12px;width:100%}.genre-grid{display:grid!important;width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.genre-card{position:relative!important;width:100%!important;aspect-ratio:10/7!important;overflow:hidden!important;background:#f4f0e6!important}.genre-card img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important;background:#f4f0e6!important;transform:none!important}';
   document.head.appendChild(style);
-
+  function equalize() {
+    const cards = document.querySelectorAll('.genre-grid .genre-card');
+    if (!cards.length) return;
+    const h = Math.round(cards[0].getBoundingClientRect().width * 7 / 10);
+    if (h) cards.forEach(card => { card.style.height = h + 'px'; card.style.minHeight = h + 'px'; });
+  }
   const genres = document.getElementById('screen-genres');
   const bar = document.createElement('div');
   bar.className = 'genre-toolbar';
@@ -49,7 +53,6 @@
   hint.style.display = 'none';
   hint.innerHTML = '<div class="hint-card">Language filter is the LANGUAGE button, or swipe down from the top. Favorites are the FAVORITES button, or swipe sideways.<button id="hint-ok" type="button">OK</button></div>';
   document.getElementById('app').appendChild(hint);
-
   state.failSkips = 0;
   state.metaTimer = null;
   const fineGenres = stationGenres;
@@ -61,10 +64,10 @@
   function loadRecent() { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch (e) { return []; } }
   function renderRecent() {
     recent.innerHTML = '';
-    loadRecent().forEach(st => {
+    loadRecent().forEach((st, idx) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'recent-chip'; b.textContent = st.name;
-      b.addEventListener('click', () => { state.listContext = { title: 'RECENT', slug: 'recent', stations: loadRecent(), sourceScreen: 'genres' }; startPlayback(loadRecent().indexOf(st)); });
+      b.addEventListener('click', () => { state.listContext = { title: 'RECENT', slug: 'recent', stations: loadRecent(), sourceScreen: 'genres' }; startPlayback(idx); });
       recent.appendChild(b);
     });
   }
@@ -85,12 +88,7 @@
     if (!('mediaSession' in navigator)) return;
     const split = splitStreamTitle(streamTitle);
     const img = groupBySlug(stationGenres(station)[0]).img;
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: split.title || station.name,
-      artist: split.artist || station.name,
-      album: station.name,
-      artwork: img ? [{ src: new URL(img, location.href).href, sizes: '256x256', type: 'image/webp' }] : []
-    });
+    navigator.mediaSession.metadata = new MediaMetadata({ title: split.title || station.name, artist: split.artist || station.name, album: station.name, artwork: img ? [{ src: new URL(img, location.href).href, sizes: '256x256', type: 'image/webp' }] : [] });
   };
   async function pollNowPlaying() {
     if (!state.player) return;
@@ -109,7 +107,6 @@
   function markStationDown() {
     if (!state.player) return;
     setNowPlaying('Station unavailable');
-    updateMediaSessionMetadata(state.player.station, 'Station unavailable');
     if (state.failSkips >= 5 || !state.player.list || state.player.list.length < 2) return;
     state.failSkips++;
     playAdjacent(1);
@@ -149,6 +146,7 @@
     const container = document.getElementById('grid-scroll-genres');
     container.innerHTML = '';
     container.appendChild(grid);
+    equalize();
     renderRecent();
   };
   openStationList = function (slug) {
@@ -195,4 +193,5 @@
   document.getElementById('hint-ok').addEventListener('click', () => { hint.style.display = 'none'; try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {} });
   if (!localStorage.getItem(HINT_KEY)) hint.style.display = 'flex';
   renderGenreGrid();
+  window.addEventListener('resize', equalize);
 })();
