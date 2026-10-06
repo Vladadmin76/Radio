@@ -1,10 +1,10 @@
-/* Service worker: app shell cache, and injection of radio-extras.js. */
-const CACHE_NAME = 'retro-radio-v3';
+/* Service worker: app shell cache, and injection of radio extras. */
+const CACHE_NAME = 'retro-radio-v4';
 const NETWORK_TIMEOUT_MS = 3000;
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(['./index.html', './radio-extras.js']).catch(() => {}))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(['./index.html', './radio-extras.js', './radio-layout.js']).catch(() => {}))
   );
   self.skipWaiting();
 });
@@ -27,8 +27,10 @@ function withTimeout(promise, ms) {
 }
 
 function inject(html) {
-  if (html.includes('radio-extras.js')) return html;
-  return html.replace('</body>', '<script src="radio-extras.js"></script></body>');
+  let out = html;
+  if (!out.includes('radio-extras.js')) out = out.replace('</body>', '<script src="radio-extras.js"></script></body>');
+  if (!out.includes('radio-layout.js')) out = out.replace('</body>', '<script src="radio-layout.js"></script></body>');
+  return out;
 }
 
 function handleShellRequest(request) {
@@ -54,7 +56,7 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || url.origin !== location.origin) return;
   if (event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/')) {
     event.respondWith(handleShellRequest(event.request));
-  } else if (url.pathname.includes('/assets/') || url.pathname.endsWith('/radio-extras.js')) {
+  } else if (url.pathname.includes('/assets/') || url.pathname.endsWith('/radio-extras.js') || url.pathname.endsWith('/radio-layout.js')) {
     event.respondWith(handleAssetRequest(event.request));
   }
 });
