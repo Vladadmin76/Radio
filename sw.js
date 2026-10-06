@@ -1,14 +1,11 @@
 /* Service worker: app shell cache, and injection of radio extras. */
-const CACHE_NAME = 'retro-radio-v5';
+const CACHE_NAME = 'retro-radio-v6';
 const NETWORK_TIMEOUT_MS = 3000;
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(['./index.html', './radio-extras.js', './radio-layout.js']).catch(() => {}))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./index.html', './radio-extras.js', './radio-layout.js']).catch(() => {})));
   self.skipWaiting();
 });
-
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
@@ -18,21 +15,18 @@ self.addEventListener('activate', event => {
     for (const client of windows) client.navigate(client.url);
   })());
 });
-
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), ms);
     promise.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
   });
 }
-
 function inject(html) {
   let out = html;
   if (!out.includes('radio-extras.js')) out = out.replace('</body>', '<script src="radio-extras.js"></script></body>');
   if (!out.includes('radio-layout.js')) out = out.replace('</body>', '<script src="radio-layout.js"></script></body>');
   return out;
 }
-
 function handleShellRequest(request) {
   return withTimeout(fetch(request), NETWORK_TIMEOUT_MS)
     .then(response => response.text().then(html => {
@@ -43,14 +37,12 @@ function handleShellRequest(request) {
     }))
     .catch(() => caches.match(request).then(cached => cached || fetch(request)));
 }
-
 function handleAssetRequest(request) {
   return fetch(request).then(response => {
     if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
   }).catch(() => caches.match(request));
 }
-
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== location.origin) return;

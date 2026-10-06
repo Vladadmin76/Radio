@@ -1,20 +1,34 @@
-/* Last-row cards were shrinking to the image. Force three equal columns.
-   Recent chips must open the player; the first handler missed the station. */
+/* Equal genre cards, original Other artwork, recent chip opens the player. */
 (function () {
   const style = document.createElement('style');
-  style.textContent = '.genre-grid{width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.genre-card{width:100%!important;min-width:0!important;aspect-ratio:10/7}.genre-card img{width:100%;height:100%;object-fit:contain;transform:none}';
+  style.textContent = [
+    '.genre-grid{display:grid!important;width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-items:stretch!important;}',
+    '.genre-card{width:100%!important;min-width:0!important;height:auto!important;aspect-ratio:10/7!important;box-sizing:border-box;}',
+    '.genre-card img{width:100%!important;height:100%!important;object-fit:contain!important;transform:scale(0.92)!important;}'
+  ].join('');
   document.head.appendChild(style);
-  function fixOther() {
-    document.querySelectorAll('.genre-card img[alt="Other"]').forEach(img => {
-      const card = img.parentElement;
-      if (!card || card.dataset.other === '1') return;
-      card.dataset.other = '1';
-      card.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:16px;letter-spacing:.04em">OTHER</div>';
-    });
+
+  function equalize() {
+    const cards = document.querySelectorAll('.genre-grid .genre-card');
+    if (!cards.length) return;
+    const w = cards[0].getBoundingClientRect().width;
+    if (!w) return;
+    const h = w * 7 / 10;
+    cards.forEach(card => { card.style.height = h + 'px'; card.style.minHeight = h + 'px'; });
   }
-  fixOther();
+  function restoreOther() {
+    document.querySelectorAll('.genre-card').forEach(card => {
+      if (card.dataset.other !== '1' && !card.querySelector('img')) {
+        card.dataset.other = '1';
+        card.innerHTML = '<img src="assets/genres/other.webp" alt="Other" draggable="false">';
+      }
+    });
+    equalize();
+  }
+  restoreOther();
+  window.addEventListener('resize', equalize);
   const grid = document.getElementById('grid-scroll-genres');
-  if (grid) new MutationObserver(fixOther).observe(grid, { childList: true, subtree: true });
+  if (grid) new MutationObserver(restoreOther).observe(grid, { childList: true, subtree: true });
 
   const recent = document.getElementById('recent-row');
   if (recent) recent.addEventListener('click', (e) => {
