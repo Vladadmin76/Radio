@@ -1,5 +1,5 @@
 /* Service worker: app shell cache, and injection of radio extras. */
-const CACHE_NAME = 'retro-radio-v4';
+const CACHE_NAME = 'retro-radio-v5';
 const NETWORK_TIMEOUT_MS = 3000;
 
 self.addEventListener('install', event => {
