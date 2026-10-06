@@ -1,5 +1,5 @@
-const CACHE_NAME='retro-radio-v11';
+const CACHE_NAME='retro-radio-v12';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil((async () => { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); await self.clients.claim(); const windows = await self.clients.matchAll({type:'window'}); for (const client of windows) client.navigate(client.url); })()); });
-function inject(html) { let out = html; if (!out.includes('radio-extras.js')) out = out.replace('</body>', '<script src="radio-extras.js?v=11"></script></body>'); if (!out.includes('radio-layout.js')) out = out.replace('</body>', '<script src="radio-layout.js?v=11"></script></body>'); return out; }
+function inject(html) { let out = html; if (!out.includes('radio-extras.js')) out = out.replace('</body>', '<script src="radio-extras.js?v=12"></script></body>'); return out; }
 self.addEventListener('fetch', event => { const url = new URL(event.request.url); if (event.request.method !== 'GET' || url.origin !== location.origin) return; if (event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/')) { event.respondWith(fetch(event.request).then(r => r.text().then(html => new Response(inject(html), {headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}}))).catch(() => caches.match(event.request))); return; } event.respondWith(fetch(event.request)); });

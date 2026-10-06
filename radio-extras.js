@@ -1,8 +1,15 @@
-/* Retro Radio additions. Card size is set here so a stale layout file cannot leave the last row short. */
+/* Retro Radio additions. Last-row cards are drawn in the same frame as the others. */
 (function () {
   const RECENT_KEY = 'retroRadioRecent_v1';
   const HINT_KEY = 'retroRadioHintSeen_v1';
   const META_URL = 'https://app.fixtorllc.com/api/radio-nowplaying';
+  function plaque(title, icon) {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140"><rect width="200" height="140" fill="#f4f0e6"/><rect x="8" y="8" width="184" height="124" rx="3" fill="#f7f4ee" stroke="#3a352c" stroke-width="3"/><rect x="14" y="14" width="172" height="112" fill="none" stroke="#3a352c" stroke-width="1.4"/><text x="100" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="15" font-weight="700" fill="#3a352c">' + title + '</text>' + icon + '</svg>';
+    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  }
+  const soundtrackImg = plaque('SOUNDTRACK', '<rect x="62" y="58" width="76" height="46" rx="2" fill="none" stroke="#3a352c" stroke-width="2.4"/><rect x="70" y="66" width="60" height="8" fill="#3a352c"/><path d="M62 58 L92 46 L138 46 L108 58 Z" fill="none" stroke="#3a352c" stroke-width="2.4"/><path d="M96 46 L108 58" stroke="#3a352c" stroke-width="2"/>');
+  const spokenImg = plaque('SPOKEN WORD', '<path d="M70 62 h28 v48 H70 z M102 62 h28 v48 h-28 z" fill="none" stroke="#3a352c" stroke-width="2.4"/><path d="M74 74 h20 M74 82 h20 M74 90 h16 M106 74 h20 M106 82 h20 M106 90 h16" stroke="#3a352c" stroke-width="1.4"/>');
+  const otherImg = plaque('OTHER', '<circle cx="100" cy="78" r="24" fill="none" stroke="#3a352c" stroke-width="3"/><path d="M84 94 L116 62" stroke="#3a352c" stroke-width="3"/><text x="100" y="116" text-anchor="middle" font-family="Georgia,serif" font-size="9" font-weight="700" fill="#3a352c">OUT OF CATEGORY</text>');
   const GENRE_GROUPS = [
     { slug: 'pop', label: 'Pop', img: 'assets/genres/pop.webp', members: ['pop','synthpop','electropop','k-pop','j-pop','t-pop','g-pop','city-pop'] },
     { slug: 'rock', label: 'Rock', img: 'assets/genres/rock.webp', members: ['rock','hard-rock','heavy-metal','thrash-metal','death-metal','black-metal','power-metal','symphonic-metal','gothic-metal','punk','post-punk','grunge','emo','alternative','indie','indie-rock','post-rock'] },
@@ -13,15 +20,15 @@
     { slug: 'classical', label: 'Classical', img: 'assets/genres/classical.webp', members: ['classical','baroque','romantic','modern-classical','choral','opera','new-age'] },
     { slug: 'country', label: 'Country', img: 'assets/genres/country.webp', members: ['country','country-rock','bluegrass','outlaw-country','americana','cowboy','folk','folk-rock','celtic'] },
     { slug: 'world', label: 'World', img: 'assets/genres/world.webp', members: ['world','afrobeat','reggae','dub','dancehall','ska','rocksteady','latin','salsa','merengue','bachata','tango','flamenco','bossa-nova','samba','forro','zouk','kizomba','afro-cuban','bhangra','bollywood'] },
-    { slug: 'soundtrack', label: 'Soundtrack', img: 'assets/genres/soundtrack.webp', members: ['soundtrack','game-music','anison'] },
-    { slug: 'spoken', label: 'Spoken', img: 'assets/genres/spoken-word.webp', members: ['spoken-word','comedy','podcast','audiobook','narration','acapella','field-recording','experimental'] },
-    { slug: 'other', label: 'Other', img: 'assets/genres/other.webp', members: [] }
+    { slug: 'soundtrack', label: 'Soundtrack', img: soundtrackImg, members: ['soundtrack','game-music','anison'] },
+    { slug: 'spoken', label: 'Spoken', img: spokenImg, members: ['spoken-word','comedy','podcast','audiobook','narration','acapella','field-recording','experimental'] },
+    { slug: 'other', label: 'Other', img: otherImg, members: [] }
   ];
   const GROUP_BY_MEMBER = {};
   GENRE_GROUPS.forEach(g => g.members.forEach(m => { GROUP_BY_MEMBER[m] = g.slug; }));
   function groupBySlug(slug) { return GENRE_GROUPS.find(g => g.slug === slug) || GENRE_GROUPS[GENRE_GROUPS.length - 1]; }
   const style = document.createElement('style');
-  style.textContent = '.genre-toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px 0;flex-shrink:0}.genre-toolbar button,.list-extra button{border:2px solid #3a352c;background:#f4f0e6;color:#3a352c;font-family:inherit;font-weight:bold;font-size:12px;letter-spacing:.04em;border-radius:4px;padding:8px 10px;cursor:pointer}.genre-toolbar input{flex:1;min-width:0;border:2px solid #3a352c;background:#fbfaf5;font-family:inherit;font-size:16px;padding:8px 10px;border-radius:4px;color:#3a352c}.recent-row{display:flex;gap:8px;overflow-x:auto;padding:8px 10px 0}.recent-chip{flex:0 0 auto;border:1px dashed #8a8168;background:#f4f0e6;color:#3a352c;font-family:inherit;font-size:13px;font-weight:bold;padding:8px 10px;border-radius:4px;cursor:pointer}.hint-overlay{position:absolute;inset:0;z-index:40;background:rgba(58,53,44,.45);display:flex;align-items:flex-end;justify-content:center;padding:18px}.hint-card{background:#fbfaf5;border:2px solid #3a352c;border-radius:8px;padding:16px;max-width:420px;font-size:16px;line-height:1.45}.hint-card button{margin-top:12px;width:100%}.genre-grid{display:grid!important;width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.genre-card{position:relative!important;width:100%!important;aspect-ratio:10/7!important;overflow:hidden!important;background:#f4f0e6!important}.genre-card img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important;background:#f4f0e6!important;transform:none!important}';
+  style.textContent = '.genre-toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px 0;flex-shrink:0}.genre-toolbar button,.list-extra button{border:2px solid #3a352c;background:#f4f0e6;color:#3a352c;font-family:inherit;font-weight:bold;font-size:12px;letter-spacing:.04em;border-radius:4px;padding:8px 10px;cursor:pointer}.genre-toolbar input{flex:1;min-width:0;border:2px solid #3a352c;background:#fbfaf5;font-family:inherit;font-size:16px;padding:8px 10px;border-radius:4px;color:#3a352c}.recent-row{display:flex;gap:8px;overflow-x:auto;padding:8px 10px 0}.recent-chip{flex:0 0 auto;border:1px dashed #8a8168;background:#f4f0e6;color:#3a352c;font-family:inherit;font-size:13px;font-weight:bold;padding:8px 10px;border-radius:4px;cursor:pointer}.hint-overlay{position:absolute;inset:0;z-index:40;background:rgba(58,53,44,.45);display:flex;align-items:flex-end;justify-content:center;padding:18px}.hint-card{background:#fbfaf5;border:2px solid #3a352c;border-radius:8px;padding:16px;max-width:420px;font-size:16px;line-height:1.45}.hint-card button{margin-top:12px;width:100%}.genre-grid{display:grid!important;width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.genre-card{position:relative!important;width:100%!important;aspect-ratio:10/7!important;overflow:hidden!important;background:#f4f0e6!important}.genre-card img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain!important;background:#f4f0e6!important;transform:none!important}';
   document.head.appendChild(style);
   function equalize() {
     const cards = document.querySelectorAll('.genre-grid .genre-card');
@@ -87,8 +94,7 @@
   updateMediaSessionMetadata = function (station, streamTitle) {
     if (!('mediaSession' in navigator)) return;
     const split = splitStreamTitle(streamTitle);
-    const img = groupBySlug(stationGenres(station)[0]).img;
-    navigator.mediaSession.metadata = new MediaMetadata({ title: split.title || station.name, artist: split.artist || station.name, album: station.name, artwork: img ? [{ src: new URL(img, location.href).href, sizes: '256x256', type: 'image/webp' }] : [] });
+    navigator.mediaSession.metadata = new MediaMetadata({ title: split.title || station.name, artist: split.artist || station.name, album: station.name });
   };
   async function pollNowPlaying() {
     if (!state.player) return;
