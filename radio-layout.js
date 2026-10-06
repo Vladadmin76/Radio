@@ -13,15 +13,15 @@
     if (!cards.length) return;
     const w = cards[0].getBoundingClientRect().width;
     if (!w) return;
-    const h = w * 7 / 10;
+    const h = Math.round(w * 7 / 10);
     cards.forEach(card => { card.style.height = h + 'px'; card.style.minHeight = h + 'px'; });
   }
   function restoreOther() {
+    document.querySelectorAll('.genre-card img[alt="Other"]').forEach(img => {
+      if (!img.src.includes('other.webp')) img.src = 'assets/genres/other.webp';
+    });
     document.querySelectorAll('.genre-card').forEach(card => {
-      if (card.dataset.other !== '1' && !card.querySelector('img')) {
-        card.dataset.other = '1';
-        card.innerHTML = '<img src="assets/genres/other.webp" alt="Other" draggable="false">';
-      }
+      if (!card.querySelector('img')) card.innerHTML = '<img src="assets/genres/other.webp" alt="Other" draggable="false">';
     });
     equalize();
   }
