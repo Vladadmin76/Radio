@@ -1,6 +1,5 @@
-/* Service worker: app shell cache, and injection of radio-extras.js so the
-   large index.html does not have to be rewritten for player improvements. */
-const CACHE_NAME = 'retro-radio-v2';
+/* Service worker: app shell cache, and injection of radio-extras.js. */
+const CACHE_NAME = 'retro-radio-v3';
 const NETWORK_TIMEOUT_MS = 3000;
 
 self.addEventListener('install', event => {
@@ -44,13 +43,10 @@ function handleShellRequest(request) {
 }
 
 function handleAssetRequest(request) {
-  return caches.match(request).then(cached => {
-    if (cached) return cached;
-    return fetch(request).then(response => {
-      if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-      return response;
-    });
-  });
+  return fetch(request).then(response => {
+    if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+    return response;
+  }).catch(() => caches.match(request));
 }
 
 self.addEventListener('fetch', event => {
