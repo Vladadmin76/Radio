@@ -20,9 +20,9 @@
     { slug: 'classical', label: 'Classical', img: 'assets/genres/classical.webp', members: ['classical','baroque','romantic','modern-classical','choral','opera','new-age'] },
     { slug: 'country', label: 'Country', img: 'assets/genres/country.webp', members: ['country','country-rock','bluegrass','outlaw-country','americana','cowboy','folk','folk-rock','celtic'] },
     { slug: 'world', label: 'World', img: 'assets/genres/world.webp', members: ['world','afrobeat','reggae','dub','dancehall','ska','rocksteady','latin','salsa','merengue','bachata','tango','flamenco','bossa-nova','samba','forro','zouk','kizomba','afro-cuban','bhangra','bollywood'] },
-    { slug: 'soundtrack', label: 'Soundtrack', img: 'assets/genres/soundtrack.webp', members: ['soundtrack','game-music','anison'] },
-    { slug: 'spoken', label: 'Spoken', img: 'assets/genres/spoken-word.webp', members: ['spoken-word','comedy','podcast','audiobook','narration','acapella','field-recording','experimental'] },
-    { slug: 'other', label: 'Other', img: 'assets/genres/other.webp', members: [] }
+    { slug: 'soundtrack', label: 'Soundtrack', img: 'assets/genres/soundtrack.webp?v=2', members: ['soundtrack','game-music','anison'] },
+    { slug: 'spoken', label: 'Spoken', img: 'assets/genres/spoken-word.webp?v=2', members: ['spoken-word','comedy','podcast','audiobook','narration','acapella','field-recording','experimental'] },
+    { slug: 'other', label: 'Other', img: 'assets/genres/other.webp?v=2', members: [] }
   ];
   const GROUP_BY_MEMBER = {};
   GENRE_GROUPS.forEach(g => g.members.forEach(m => { GROUP_BY_MEMBER[m] = g.slug; }));
