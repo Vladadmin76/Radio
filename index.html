@@ -98,15 +98,16 @@ html, body {
 .filter-actions button.primary { background: #3a352c; color: #eae3d3; }
 
 /* ---------- station list ---------- */
-.station-list { flex: 1; overflow-y: auto; padding: 4px 10px 20px; }
+.station-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 10px 20px; }
 .station-row {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 8px; border-bottom: 1px dashed #cfc6ac;
   cursor: pointer;
 }
 .station-row:active { background: #ded5bd; }
-.station-name { font-size: 20.25px; font-weight: bold; flex: 1; }
-.station-meta { font-size: 20.5px; color: #16337a; }
+.station-row > div { min-width: 0; }
+.station-name { font-size: 20.25px; font-weight: bold; flex: 1; overflow-wrap: anywhere; }
+.station-meta { font-size: 20.5px; color: #16337a; overflow-wrap: anywhere; }
 
 /* ---------- player screen ---------- */
 .player-screen { align-items: center; justify-content: flex-start; padding-top: 18px; }
