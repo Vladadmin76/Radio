@@ -529,24 +529,29 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('nexttrack', () => playAdjacent(1));
 }
 
-// Some stations send StreamTitle in a legacy single-byte encoding (e.g. Windows-1251)
-// instead of UTF-8; when read as UTF-8 that shows up as "Ð.../Ã..." mojibake. Detect
-// and repair it by reinterpreting the (wrongly-decoded) characters as raw UTF-8 bytes.
+// Some stations send StreamTitle in a legacy single-byte encoding (Windows-1251, or
+// UTF-8 bytes that got read as Latin-1 somewhere upstream) instead of proper UTF-8;
+// that shows up as "Ð.../Ã..." mojibake. Repair each run of raw high-byte characters
+// by reinterpreting it as the bytes of its original encoding, trying UTF-8 first and
+// falling back to Windows-1251 (accepted only if it yields mostly Cyrillic letters,
+// so genuine accented text like "Café" is left alone).
+function fixMojibakeRun(segment) {
+  const bytes = Uint8Array.from(segment, ch => ch.charCodeAt(0));
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch (e) {}
+  try {
+    const decoded = new TextDecoder('windows-1251', { fatal: true }).decode(bytes);
+    const letters = decoded.match(/\p{L}/gu) || [];
+    const cyrillic = decoded.match(/[Ѐ-ӿ]/g) || [];
+    if (letters.length >= 2 && cyrillic.length / letters.length > 0.5) return decoded;
+  } catch (e) {}
+  return null;
+}
+
 function fixMojibake(str) {
   if (!str) return str;
-  let hasHighByte = false;
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    if (code > 255) return str; // already has real non-Latin1 characters — not mojibake
-    if (code >= 128) hasHighByte = true;
-  }
-  if (!hasHighByte) return str;
-  try {
-    const bytes = Uint8Array.from(str, ch => ch.charCodeAt(0));
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch (e) {
-    return str;
-  }
+  return str.replace(/[\u0080-ÿ]+/g, segment => fixMojibakeRun(segment) ?? segment);
 }
 
 function splitStreamTitle(raw) {
