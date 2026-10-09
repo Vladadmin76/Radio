@@ -4,10 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Retro Radio</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
 <style>
+/* "Fet" by Blue Curve Designstudio, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/) */
+@font-face {
+  font-family: 'Fet';
+  src: url('assets/fonts/Fet.ttf') format('truetype');
+  font-display: swap;
+}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 html, body {
   margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -167,13 +170,12 @@ html, body {
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .cassette-nowplaying {
-  position: absolute; left: 20%; width: 60%; text-align: center;
-  font-family: 'Great Vibes', cursive; font-weight: 400;
-  font-size: clamp(17px, 5.6vw, 26px); color: #1a3d8f; line-height: 1.2;
+  position: absolute; left: 12%; width: 76%; top: 25.5%; transform: translateY(-50%);
+  text-align: center;
+  font-family: 'Fet', cursive; font-weight: 400;
+  font-size: clamp(20px, 7vw, 32px); color: #1a3d8f; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.cassette-nowplaying.line1 { top: 15%; }
-.cassette-nowplaying.line2 { top: 21.5%; }
 .cassette-quality {
   position: absolute; right: 8%; top: 36%; width: 11%;
   aspect-ratio: 10 / 7;
@@ -258,8 +260,7 @@ html, body {
         <img class="cassette-bg" id="cassette-bg-img" draggable="false">
         <div class="cassette-genre" id="cassette-genre"></div>
         <div class="cassette-title" id="cassette-title"></div>
-        <div class="cassette-nowplaying line1" id="cassette-np-artist"></div>
-        <div class="cassette-nowplaying line2" id="cassette-np-title"></div>
+        <div class="cassette-nowplaying" id="cassette-np"></div>
         <div class="cassette-quality" id="cassette-quality">
           <div class="cassette-quality-icon" id="cassette-quality-icon"><span id="cassette-quality-label"></span></div>
           <div class="cassette-quality-menu" id="cassette-quality-menu"></div>
@@ -547,10 +548,8 @@ function updateMediaSessionMetadata(station, streamTitle) {
 
 function updateNowPlayingDisplay(station, streamTitle) {
   const split = splitStreamTitle(streamTitle);
-  const artistEl = document.getElementById('cassette-np-artist');
-  const titleEl = document.getElementById('cassette-np-title');
-  if (artistEl) artistEl.textContent = split.artist;
-  if (titleEl) titleEl.textContent = split.title;
+  const npEl = document.getElementById('cassette-np');
+  if (npEl) npEl.textContent = split.artist && split.title ? `${split.artist} — ${split.title}` : (split.title || split.artist || '');
   const barText = document.getElementById('now-playing-text');
   if (barText) barText.textContent = split.title ? `${station.name} — ${split.title}` : station.name;
   updateMediaSessionMetadata(station, streamTitle);
