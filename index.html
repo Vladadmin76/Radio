@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Retro Radio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 html, body {
@@ -21,11 +24,27 @@ html, body {
   margin: 0 auto;
   background: #eae3d3;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+
+/* ---------- now playing bar ---------- */
+.now-playing-bar {
+  flex-shrink: 0; position: relative; z-index: 15;
+  background: #3a352c; color: #eae3d3;
+  padding: 10px 14px; font-size: 14px; font-weight: bold;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  white-space: nowrap; overflow: hidden;
+}
+.now-playing-bar:active { background: #2a261f; }
+.now-playing-bar #now-playing-text {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.now-playing-bar::before { content: '▶'; flex-shrink: 0; font-size: 11px; }
 
 /* ---------- screens ---------- */
 .screens {
-  position: absolute; inset: 0;
+  position: relative; flex: 1; min-height: 0;
   overflow: hidden;
 }
 .screen {
@@ -48,6 +67,24 @@ html, body {
 .back-btn {
   font-size: 30px; padding: 4px 10px; cursor: pointer; color: #3a352c;
   background: none; border: none;
+}
+
+/* ---------- genre toolbar ---------- */
+.genre-toolbar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 10px 10px 0; flex-shrink: 0;
+}
+.genre-toolbar button {
+  border: 2px solid #3a352c; background: #f4f0e6; color: #3a352c;
+  font-family: inherit; font-weight: bold; font-size: 14px; letter-spacing: 0.04em;
+  border-radius: 4px; padding: 10px 12px; cursor: pointer; white-space: nowrap;
+}
+.genre-toolbar button:active { background: #ded5bd; }
+.genre-toolbar input[type="search"] {
+  flex: 1; min-width: 120px;
+  border: 2px solid #3a352c; background: #fbfaf5;
+  font-family: inherit; font-size: 16px; padding: 10px 12px;
+  border-radius: 4px; color: #3a352c;
 }
 
 /* ---------- genre grid ---------- */
@@ -129,6 +166,14 @@ html, body {
   color: #35312a;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+.cassette-nowplaying {
+  position: absolute; left: 20%; width: 60%; text-align: center;
+  font-family: 'Great Vibes', cursive; font-weight: 400;
+  font-size: clamp(17px, 5.6vw, 26px); color: #1a3d8f; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cassette-nowplaying.line1 { top: 15%; }
+.cassette-nowplaying.line2 { top: 21.5%; }
 .cassette-quality {
   position: absolute; right: 8%; top: 36%; width: 11%;
   aspect-ratio: 10 / 7;
@@ -182,10 +227,18 @@ html, body {
 </head>
 <body>
 <div id="app">
+  <div class="now-playing-bar" id="now-playing-bar" style="display:none;">
+    <span id="now-playing-text"></span>
+  </div>
   <div class="screens">
 
     <!-- GENRES SCREEN -->
     <div id="screen-genres" class="screen" style="display:flex;">
+      <div class="genre-toolbar">
+        <button type="button" id="btn-language">LANGUAGE</button>
+        <button type="button" id="btn-favorites">FAVORITES</button>
+        <input type="search" id="station-search" placeholder="Search station" autocomplete="off">
+      </div>
       <div id="grid-scroll-genres" class="grid-scroll"></div>
     </div>
 
@@ -205,6 +258,8 @@ html, body {
         <img class="cassette-bg" id="cassette-bg-img" draggable="false">
         <div class="cassette-genre" id="cassette-genre"></div>
         <div class="cassette-title" id="cassette-title"></div>
+        <div class="cassette-nowplaying line1" id="cassette-np-artist"></div>
+        <div class="cassette-nowplaying line2" id="cassette-np-title"></div>
         <div class="cassette-quality" id="cassette-quality">
           <div class="cassette-quality-icon" id="cassette-quality-icon"><span id="cassette-quality-label"></span></div>
           <div class="cassette-quality-menu" id="cassette-quality-menu"></div>
@@ -269,6 +324,8 @@ const FAV_KEY = 'retroRadioFavorites_v1';
 const POOL_LIMIT = 3000;
 const POOL_CACHE_KEY = 'retroRadioPoolCache_v1';
 const POOL_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const NOWPLAYING_META_URL = 'https://app.fixtorllc.com/api/radio-nowplaying';
+const NOWPLAYING_POLL_MS = 20000;
 
 /* ============ state ============ */
 const state = {
@@ -280,7 +337,8 @@ const state = {
   player: null,                // { station, list, index, variants }
   reconnectTimer: null,
   reconnectAttempts: 0,
-  stallGraceTimer: null
+  stallGraceTimer: null,
+  metaTimer: null
 };
 
 /* ============ helpers ============ */
@@ -470,9 +528,56 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('nexttrack', () => playAdjacent(1));
 }
 
-function updateMediaSessionMetadata(station) {
+function splitStreamTitle(raw) {
+  const text = String(raw || '').trim();
+  const parts = text.split(' - ');
+  if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
+  return { title: text, artist: '' };
+}
+
+function updateMediaSessionMetadata(station, streamTitle) {
   if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.metadata = new MediaMetadata({ title: station.name, artist: 'Retro Radio' });
+  const split = splitStreamTitle(streamTitle);
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: split.title || station.name,
+    artist: split.artist || station.name,
+    album: station.name
+  });
+}
+
+function updateNowPlayingDisplay(station, streamTitle) {
+  const split = splitStreamTitle(streamTitle);
+  const artistEl = document.getElementById('cassette-np-artist');
+  const titleEl = document.getElementById('cassette-np-title');
+  if (artistEl) artistEl.textContent = split.artist;
+  if (titleEl) titleEl.textContent = split.title;
+  const barText = document.getElementById('now-playing-text');
+  if (barText) barText.textContent = split.title ? `${station.name} — ${split.title}` : station.name;
+  updateMediaSessionMetadata(station, streamTitle);
+}
+
+async function pollNowPlaying() {
+  if (!state.player) return;
+  const station = state.player.station;
+  try {
+    const res = await fetch(NOWPLAYING_META_URL + '?url=' + encodeURIComponent(station.url_resolved || station.url));
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!state.player || state.player.station !== station) return;
+    updateNowPlayingDisplay(station, data.streamTitle || '');
+  } catch (e) {}
+}
+
+function startMetaPoll() {
+  clearInterval(state.metaTimer);
+  pollNowPlaying();
+  state.metaTimer = setInterval(pollNowPlaying, NOWPLAYING_POLL_MS);
+}
+
+function updateNowPlayingBar() {
+  const bar = document.getElementById('now-playing-bar');
+  if (!bar) return;
+  bar.style.display = (state.player && state.screen !== 'player') ? 'flex' : 'none';
 }
 
 function findVariants(station) {
@@ -557,7 +662,9 @@ function playStation(station) {
   audioEl.load();
   audioEl.play().catch(() => {});
   updatePlayPauseIcon();
-  updateMediaSessionMetadata(station);
+  updateNowPlayingDisplay(station, '');
+  startMetaPoll();
+  updateNowPlayingBar();
 }
 
 audioEl.addEventListener('playing', () => {
@@ -621,6 +728,7 @@ function goToScreen(name) {
   document.getElementById('screen-genres').style.display = name === 'genres' ? 'flex' : 'none';
   document.getElementById('screen-list').style.display = name === 'list' ? 'flex' : 'none';
   document.getElementById('screen-player').style.display = name === 'player' ? 'flex' : 'none';
+  updateNowPlayingBar();
 }
 
 function exitList() { goToScreen(state.listContext.sourceScreen); }
@@ -686,6 +794,18 @@ function init() {
   document.getElementById('filter-apply').addEventListener('click', applyFilter);
   document.getElementById('filter-reset').addEventListener('click', resetFilter);
   document.getElementById('back-from-list').addEventListener('click', exitList);
+  document.getElementById('btn-language').addEventListener('click', openFilter);
+  document.getElementById('btn-favorites').addEventListener('click', openFavoritesList);
+  document.getElementById('now-playing-bar').addEventListener('click', () => goToScreen('player'));
+  document.getElementById('station-search').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const q = e.target.value.trim().toLowerCase();
+    if (q.length < 2) return;
+    const stations = dedupeByName(state.pool.filter(s => (s.name || '').toLowerCase().includes(q)));
+    state.listContext = { title: 'SEARCH', slug: null, stations, sourceScreen: 'genres' };
+    renderStationList();
+    goToScreen('list');
+  });
 
   document.getElementById('btn-stopplay').addEventListener('click', togglePlayPause);
   document.getElementById('btn-forward').addEventListener('click', () => playAdjacent(1));
