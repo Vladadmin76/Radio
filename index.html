@@ -218,6 +218,24 @@ html, body {
 }
 .transport-btn { width: 16%; cursor: pointer; flex-shrink: 0; }
 .transport-btn img { width: 100%; display: block; }
+.debug-log-wrap { width: 92%; max-width: 480px; margin: 18px auto 0; }
+#btn-debug-log {
+  display: block; margin: 0 auto; background: none; border: none; color: #998f78;
+  font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.05em;
+  text-decoration: underline; cursor: pointer; padding: 6px;
+}
+#debug-log-counter { text-decoration: none; font-weight: bold; color: #6b6150; }
+.debug-log-panel { margin-top: 6px; }
+#debug-log-text {
+  width: 100%; height: 160px; box-sizing: border-box; resize: vertical;
+  font-family: 'Courier New', monospace; font-size: 11px; color: #3a352c;
+  background: #fbfaf5; border: 1px solid #c9c0a8; border-radius: 4px; padding: 8px;
+}
+#btn-debug-copy {
+  margin-top: 6px; font-family: 'Courier New', monospace; font-size: 13px;
+  background: #e4dcc6; border: 1px solid #a99; border-radius: 4px; padding: 6px 14px; cursor: pointer;
+}
+.debug-log-copied { margin-left: 10px; font-size: 12px; color: #2a7a2a; }
 .transport-btn:active { transform: scale(0.92); }
 .transport-btn.stopplay { width: 19%; }
 
@@ -284,6 +302,14 @@ html, body {
           <img id="btn-fav-add-img" draggable="false">
         </div>
       </div>
+      <div class="debug-log-wrap">
+        <button type="button" id="btn-debug-log">ЛОГИ ТРЕКА <span id="debug-log-counter">№0</span></button>
+        <div class="debug-log-panel" id="debug-log-panel" style="display:none;">
+          <textarea id="debug-log-text" readonly spellcheck="false"></textarea>
+          <button type="button" id="btn-debug-copy">Скопировать</button>
+          <span class="debug-log-copied" id="debug-log-copied" style="display:none;">Скопировано!</span>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -339,7 +365,9 @@ const state = {
   reconnectTimer: null,
   reconnectAttempts: 0,
   stallGraceTimer: null,
-  metaTimer: null
+  metaTimer: null,
+  debugLog: [],
+  debugCounter: 0
 };
 
 /* ============ helpers ============ */
@@ -580,6 +608,31 @@ function updateNowPlayingDisplay(station, streamTitle) {
   updateMediaSessionMetadata(station, streamTitle);
 }
 
+// Keeps the last entries of raw (pre-fix) track metadata so a broken-looking track
+// name can be captured and copied out for diagnosis instead of only seen on screen.
+const DEBUG_LOG_MAX = 50;
+function logDebugRawTitle(station, raw) {
+  if (!raw) return;
+  const last = state.debugLog[state.debugLog.length - 1];
+  if (last && last.station === station.name && last.raw === raw) return;
+  const codes = Array.from(String(raw)).map(ch => ch.charCodeAt(0)).join(',');
+  const time = new Date().toLocaleTimeString();
+  state.debugCounter++;
+  state.debugLog.push({ n: state.debugCounter, time, station: station.name, raw, codes });
+  if (state.debugLog.length > DEBUG_LOG_MAX) state.debugLog.shift();
+  const counterEl = document.getElementById('debug-log-counter');
+  if (counterEl) counterEl.textContent = '№' + state.debugCounter;
+  renderDebugLog();
+}
+
+function renderDebugLog() {
+  const el = document.getElementById('debug-log-text');
+  if (!el || el.closest('.debug-log-panel').style.display === 'none') return;
+  el.value = state.debugLog.map(e =>
+    `№${e.n} [${e.time}] station="${e.station}"\nraw="${e.raw}"\ncodes=[${e.codes}]\n`
+  ).join('\n') || '(пока пусто — подожди, пока на станции сменится трек)';
+}
+
 async function pollNowPlaying() {
   if (!state.player) return;
   const station = state.player.station;
@@ -588,6 +641,7 @@ async function pollNowPlaying() {
     if (!res.ok) return;
     const data = await res.json();
     if (!state.player || state.player.station !== station) return;
+    logDebugRawTitle(station, data.streamTitle || '');
     updateNowPlayingDisplay(station, data.streamTitle || '');
   } catch (e) {}
 }
@@ -859,6 +913,27 @@ function init() {
   document.addEventListener('click', e => {
     const wrap = document.getElementById('cassette-quality');
     if (!wrap.contains(e.target)) document.getElementById('cassette-quality-menu').classList.remove('open');
+  });
+
+  document.getElementById('btn-debug-log').addEventListener('click', () => {
+    const panel = document.getElementById('debug-log-panel');
+    const open = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    if (!open) renderDebugLog();
+  });
+  document.getElementById('btn-debug-copy').addEventListener('click', async () => {
+    const text = document.getElementById('debug-log-text').value;
+    const copiedLabel = document.getElementById('debug-log-copied');
+    const showCopied = () => { copiedLabel.style.display = 'inline'; setTimeout(() => { copiedLabel.style.display = 'none'; }, 2000); };
+    try {
+      await navigator.clipboard.writeText(text);
+      showCopied();
+    } catch (e) {
+      const ta = document.getElementById('debug-log-text');
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); showCopied(); } catch (e2) {}
+    }
   });
 
   attachSwipe(document.getElementById('screen-genres'), { horizontal: openFavoritesList, down: openFilter });
