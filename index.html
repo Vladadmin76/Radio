@@ -523,7 +523,7 @@ function renderStationList() {
 const audioEl = new Audio();
 
 if ('mediaSession' in navigator) {
-  navigator.mediaSession.setActionHandler('play', () => audioEl.play().catch(() => {}));
+  navigator.mediaSession.setActionHandler('play', () => resumePlayback());
   navigator.mediaSession.setActionHandler('pause', () => { clearTimeout(state.reconnectTimer); audioEl.pause(); });
   navigator.mediaSession.setActionHandler('previoustrack', () => playAdjacent(-1));
   navigator.mediaSession.setActionHandler('nexttrack', () => playAdjacent(1));
@@ -718,8 +718,24 @@ function silentReconnect() {
   }, 1500 * Math.min(state.reconnectAttempts, 4));
 }
 
+// Resuming a live stream by simply calling play() on the paused <audio> element
+// often replays stale buffered data and glitches/stutters — especially after the
+// OS suspends playback for a while (e.g. the microphone was used elsewhere).
+// Reconnecting fresh on resume avoids that.
+function resumePlayback() {
+  if (!state.player) return;
+  clearTimeout(state.reconnectTimer);
+  clearTimeout(state.stallGraceTimer);
+  state.stallGraceTimer = null;
+  state.reconnectAttempts = 0;
+  const s = state.player.station;
+  audioEl.src = s.url_resolved || s.url;
+  audioEl.load();
+  audioEl.play().catch(() => {});
+}
+
 function togglePlayPause() {
-  if (audioEl.paused) audioEl.play().catch(()=>{});
+  if (audioEl.paused) resumePlayback();
   else {
     clearTimeout(state.reconnectTimer);
     clearTimeout(state.stallGraceTimer);
