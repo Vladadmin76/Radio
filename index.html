@@ -176,6 +176,7 @@ html, body {
   font-size: clamp(20px, 7vw, 32px); color: #1a3d8f; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.cassette-nowplaying.title { top: 66.5%; }
 .cassette-quality {
   position: absolute; right: 8%; top: 36%; width: 11%;
   aspect-ratio: 10 / 7;
@@ -202,11 +203,6 @@ html, body {
 }
 .cassette-quality-menu div:last-child { border-bottom: none; }
 .cassette-quality-menu div:active, .cassette-quality-menu div.selected { background: #ded5bd; }
-.cassette-fav-indicator {
-  position: absolute; left: 50%; bottom: 27.5%; transform: translateX(-50%);
-  width: 7.2%;
-}
-.cassette-fav-indicator img { width: 100%; display: block; opacity: 0.85; }
 .cassette-status {
   position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%);
   font-size: 15px; color: #8a8168; letter-spacing: 0.05em;
@@ -278,12 +274,12 @@ html, body {
         <img class="cassette-bg" id="cassette-bg-img" draggable="false">
         <div class="cassette-genre" id="cassette-genre"></div>
         <div class="cassette-title" id="cassette-title"></div>
-        <div class="cassette-nowplaying" id="cassette-np"></div>
+        <div class="cassette-nowplaying" id="cassette-np-artist"></div>
+        <div class="cassette-nowplaying title" id="cassette-np-title"></div>
         <div class="cassette-quality" id="cassette-quality">
           <div class="cassette-quality-icon" id="cassette-quality-icon"><span id="cassette-quality-label"></span></div>
           <div class="cassette-quality-menu" id="cassette-quality-menu"></div>
         </div>
-        <div class="cassette-fav-indicator"><img id="cassette-fav-img" draggable="false"></div>
       </div>
       <div class="transport">
         <div class="transport-btn" id="btn-fav-remove-wrap" title="Remove from favorites">
@@ -620,8 +616,10 @@ function updateMediaSessionMetadata(station, streamTitle) {
 
 function updateNowPlayingDisplay(station, streamTitle) {
   const split = splitStreamTitle(streamTitle);
-  const npEl = document.getElementById('cassette-np');
-  if (npEl) npEl.textContent = split.artist && split.title ? `${split.artist} — ${split.title}` : (split.title || split.artist || '');
+  const artistEl = document.getElementById('cassette-np-artist');
+  const titleEl = document.getElementById('cassette-np-title');
+  if (artistEl) artistEl.textContent = split.artist;
+  if (titleEl) titleEl.textContent = split.title;
   const barText = document.getElementById('now-playing-text');
   if (barText) barText.textContent = split.title ? `${station.name} — ${split.title}` : station.name;
   updateMediaSessionMetadata(station, streamTitle);
@@ -738,9 +736,6 @@ function renderPlayer() {
 
 function updateFavIndicator() {
   const fav = isFavorite(state.player.station);
-  const img = document.getElementById('cassette-fav-img');
-  img.src = BTN.star_filled;
-  img.style.visibility = fav ? 'visible' : 'hidden';
   document.getElementById('btn-fav-add-wrap').style.opacity = fav ? '0.3' : '1';
   document.getElementById('btn-fav-remove-wrap').style.opacity = fav ? '1' : '0.3';
 }
