@@ -218,7 +218,7 @@ html, body {
    way. Tapping debug-reveal-zone four times quickly reveals the "ЛОГИ ТРЕКА"
    button/panel for on-device diagnosis (see ensureDebugLogVisible in the script). */
 .debug-log-wrap { display: none; width: 92%; max-width: 480px; margin: 18px auto 0; }
-#debug-reveal-zone { width: 100%; flex: 1; min-height: 120px; }
+#debug-reveal-zone { width: 100%; flex: 1; min-height: 50vh; }
 #btn-debug-log {
   display: block; margin: 0 auto; background: none; border: none; color: #998f78;
   font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.05em;
@@ -935,15 +935,18 @@ function init() {
   });
 
   let revealTapTimes = [];
-  document.getElementById('debug-reveal-zone').addEventListener('click', () => {
+  function handleRevealTap() {
     const now = Date.now();
-    revealTapTimes = revealTapTimes.filter(t => now - t < 1500);
+    revealTapTimes = revealTapTimes.filter(t => now - t < 2000);
     revealTapTimes.push(now);
     if (revealTapTimes.length >= 4) {
       revealTapTimes = [];
       document.querySelector('.debug-log-wrap').style.display = 'block';
     }
-  });
+  }
+  const revealZone = document.getElementById('debug-reveal-zone');
+  revealZone.addEventListener('touchend', handleRevealTap, { passive: true });
+  revealZone.addEventListener('click', handleRevealTap);
 
   document.getElementById('btn-debug-log').addEventListener('click', () => {
     const panel = document.getElementById('debug-log-panel');
