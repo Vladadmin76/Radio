@@ -2,7 +2,7 @@
    Cross-origin requests (radio-browser API, audio streams) are never touched here —
    only same-origin files (index.html, assets/*) are cached. */
 
-const CACHE_NAME = 'retro-radio-v1';
+const CACHE_NAME = 'retro-radio-v2';
 const NETWORK_TIMEOUT_MS = 3000;
 
 self.addEventListener('install', event => {
@@ -36,7 +36,10 @@ function withTimeout(promise, ms) {
 // on a blank screen if the app has loaded successfully before.
 function handleShellRequest(request) {
   const cachePut = caches.open(CACHE_NAME);
-  return withTimeout(fetch(request), NETWORK_TIMEOUT_MS)
+  // cache: 'no-store' bypasses the browser's own HTTP cache (GitHub Pages serves
+  // index.html with a 10-minute max-age), so edits actually reach the device instead
+  // of silently serving a stale shell for up to 10 minutes after every deploy.
+  return withTimeout(fetch(request, { cache: 'no-store' }), NETWORK_TIMEOUT_MS)
     .then(response => {
       if (response && response.ok) {
         cachePut.then(cache => cache.put(request, response.clone()));

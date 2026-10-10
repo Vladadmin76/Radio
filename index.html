@@ -215,8 +215,8 @@ html, body {
 .transport-btn { width: 16%; cursor: pointer; flex-shrink: 0; }
 .transport-btn img { width: 100%; display: block; }
 /* Hidden by default — the raw-metadata logging still runs in the background either
-   way. Tapping debug-reveal-zone four times quickly reveals the "ЛОГИ ТРЕКА"
-   button/panel for on-device diagnosis (see ensureDebugLogVisible in the script). */
+   way. Holding down on debug-reveal-zone for ~1.5s reveals the "ЛОГИ ТРЕКА"
+   button/panel for on-device diagnosis (see startRevealPress in the script). */
 .debug-log-wrap { display: none; width: 92%; max-width: 480px; margin: 18px auto 0; }
 #debug-reveal-zone { width: 100%; flex: 1; min-height: 50vh; }
 #btn-debug-log {
@@ -934,23 +934,25 @@ function init() {
     if (!wrap.contains(e.target)) document.getElementById('cassette-quality-menu').classList.remove('open');
   });
 
-  let revealTapTimes = [];
-  function handleRevealTap() {
-    const now = Date.now();
-    revealTapTimes = revealTapTimes.filter(t => now - t < 2000);
-    revealTapTimes.push(now);
-    if (revealTapTimes.length >= 4) {
-      revealTapTimes = [];
-      document.querySelector('.debug-log-wrap').style.display = 'block';
-    }
-  }
+  // A long press (hold ~1.5s without lifting) is a single continuous touch, so it
+  // sidesteps iOS's rapid-repeated-tap gesture disambiguation entirely instead of
+  // trying to out-guess it.
   const revealZone = document.getElementById('debug-reveal-zone');
-  // iOS can silently swallow rapid repeated taps in standalone/home-screen PWA mode
-  // while it's trying to decide whether they're a double-tap-to-zoom gesture, so
-  // touchend/click alone can miss them. A non-passive touchstart with preventDefault
-  // opts this element out of that gesture disambiguation so every tap is counted.
-  revealZone.addEventListener('touchstart', e => { e.preventDefault(); handleRevealTap(); }, { passive: false });
-  revealZone.addEventListener('click', handleRevealTap);
+  let revealPressTimer = null;
+  const REVEAL_HOLD_MS = 1500;
+  const startRevealPress = e => {
+    e.preventDefault();
+    clearTimeout(revealPressTimer);
+    revealPressTimer = setTimeout(() => { document.querySelector('.debug-log-wrap').style.display = 'block'; }, REVEAL_HOLD_MS);
+  };
+  const cancelRevealPress = () => clearTimeout(revealPressTimer);
+  revealZone.addEventListener('touchstart', startRevealPress, { passive: false });
+  revealZone.addEventListener('touchend', cancelRevealPress);
+  revealZone.addEventListener('touchcancel', cancelRevealPress);
+  revealZone.addEventListener('touchmove', cancelRevealPress);
+  revealZone.addEventListener('mousedown', startRevealPress);
+  revealZone.addEventListener('mouseup', cancelRevealPress);
+  revealZone.addEventListener('mouseleave', cancelRevealPress);
 
   document.getElementById('btn-debug-log').addEventListener('click', () => {
     const panel = document.getElementById('debug-log-panel');
