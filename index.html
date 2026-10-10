@@ -218,7 +218,13 @@ html, body {
    way. Holding down on debug-reveal-zone for ~1.5s reveals the "ЛОГИ ТРЕКА"
    button/panel for on-device diagnosis (see startRevealPress in the script). */
 .debug-log-wrap { display: none; width: 92%; max-width: 480px; margin: 18px auto 0; }
-#debug-reveal-zone { width: 100%; flex: 1; min-height: 50vh; }
+#debug-reveal-zone { width: 100%; flex: 1; min-height: 50vh; position: relative; overflow: hidden; }
+/* Sits on top of the (invisible) long-press zone purely for display — pointer-events:
+   none lets taps/holds pass through to it underneath. */
+#artist-photo {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  pointer-events: none; display: none;
+}
 #btn-debug-log {
   display: block; margin: 0 auto; background: none; border: none; color: #35312a;
   font-family: 'Courier New', monospace; font-size: 17px; font-weight: bold; letter-spacing: 0.03em;
@@ -310,7 +316,7 @@ html, body {
           <span class="debug-log-copied" id="debug-log-copied" style="display:none;">Скопировано!</span>
         </div>
       </div>
-      <div id="debug-reveal-zone"></div>
+      <div id="debug-reveal-zone"><img id="artist-photo" draggable="false"></div>
     </div>
 
   </div>
@@ -609,14 +615,48 @@ function splitStreamTitle(raw) {
   return { title: text, artist: '' };
 }
 
-function updateMediaSessionMetadata(station, streamTitle) {
+function updateMediaSessionMetadata(station, streamTitle, artworkUrl) {
   if (!('mediaSession' in navigator)) return;
   const split = splitStreamTitle(streamTitle);
   navigator.mediaSession.metadata = new MediaMetadata({
     title: split.title || station.name,
     artist: split.artist || station.name,
-    album: station.name
+    album: station.name,
+    artwork: artworkUrl ? [{ src: artworkUrl, sizes: '600x600', type: 'image/jpeg' }] : []
   });
+}
+
+// Looks up cover art for the current artist via the iTunes Search API (free, no key,
+// and — unlike most music APIs — actually allows direct browser fetches via CORS).
+// It's single/album artwork rather than a guaranteed artist portrait, but for most
+// pop tracks that's close enough, and there's no backend here to proxy a better source.
+let lastPhotoArtist = null;
+async function updateArtistPhoto(artist) {
+  const img = document.getElementById('artist-photo');
+  if (!img) return null;
+  if (!artist) {
+    lastPhotoArtist = null;
+    img.style.display = 'none';
+    img.src = '';
+    return null;
+  }
+  if (artist === lastPhotoArtist) return img.dataset.url || null;
+  lastPhotoArtist = artist;
+  img.style.display = 'none';
+  try {
+    const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(artist) + '&media=music&entity=song&limit=1');
+    if (!res.ok) return null;
+    const data = await res.json();
+    const art = data.results && data.results[0] && data.results[0].artworkUrl100;
+    if (!art || artist !== lastPhotoArtist) return null;
+    const bigArt = art.replace('100x100bb.jpg', '600x600bb.jpg');
+    img.src = bigArt;
+    img.style.display = 'block';
+    img.dataset.url = bigArt;
+    return bigArt;
+  } catch (e) {
+    return null;
+  }
 }
 
 function updateNowPlayingDisplay(station, streamTitle) {
@@ -628,6 +668,7 @@ function updateNowPlayingDisplay(station, streamTitle) {
   const barText = document.getElementById('now-playing-text');
   if (barText) barText.textContent = split.title ? `${station.name} — ${split.title}` : station.name;
   updateMediaSessionMetadata(station, streamTitle);
+  updateArtistPhoto(split.artist).then(url => updateMediaSessionMetadata(station, streamTitle, url));
 }
 
 // Keeps the last entries of raw (pre-fix) track metadata so a broken-looking track
