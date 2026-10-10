@@ -214,7 +214,11 @@ html, body {
 }
 .transport-btn { width: 16%; cursor: pointer; flex-shrink: 0; }
 .transport-btn img { width: 100%; display: block; }
-.debug-log-wrap { width: 92%; max-width: 480px; margin: 18px auto 0; }
+/* Hidden by default — the raw-metadata logging still runs in the background either
+   way. Tapping debug-reveal-zone four times quickly reveals the "ЛОГИ ТРЕКА"
+   button/panel for on-device diagnosis (see ensureDebugLogVisible in the script). */
+.debug-log-wrap { display: none; width: 92%; max-width: 480px; margin: 18px auto 0; }
+#debug-reveal-zone { width: 100%; flex: 1; min-height: 120px; }
 #btn-debug-log {
   display: block; margin: 0 auto; background: none; border: none; color: #998f78;
   font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.05em;
@@ -298,6 +302,7 @@ html, body {
           <img id="btn-fav-add-img" draggable="false">
         </div>
       </div>
+      <div id="debug-reveal-zone"></div>
       <div class="debug-log-wrap">
         <button type="button" id="btn-debug-log">ЛОГИ ТРЕКА <span id="debug-log-counter">№0</span></button>
         <div class="debug-log-panel" id="debug-log-panel" style="display:none;">
@@ -927,6 +932,17 @@ function init() {
   document.addEventListener('click', e => {
     const wrap = document.getElementById('cassette-quality');
     if (!wrap.contains(e.target)) document.getElementById('cassette-quality-menu').classList.remove('open');
+  });
+
+  let revealTapTimes = [];
+  document.getElementById('debug-reveal-zone').addEventListener('click', () => {
+    const now = Date.now();
+    revealTapTimes = revealTapTimes.filter(t => now - t < 1500);
+    revealTapTimes.push(now);
+    if (revealTapTimes.length >= 4) {
+      revealTapTimes = [];
+      document.querySelector('.debug-log-wrap').style.display = 'block';
+    }
   });
 
   document.getElementById('btn-debug-log').addEventListener('click', () => {
