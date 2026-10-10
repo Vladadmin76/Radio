@@ -945,7 +945,11 @@ function init() {
     }
   }
   const revealZone = document.getElementById('debug-reveal-zone');
-  revealZone.addEventListener('touchend', handleRevealTap, { passive: true });
+  // iOS can silently swallow rapid repeated taps in standalone/home-screen PWA mode
+  // while it's trying to decide whether they're a double-tap-to-zoom gesture, so
+  // touchend/click alone can miss them. A non-passive touchstart with preventDefault
+  // opts this element out of that gesture disambiguation so every tap is counted.
+  revealZone.addEventListener('touchstart', e => { e.preventDefault(); handleRevealTap(); }, { passive: false });
   revealZone.addEventListener('click', handleRevealTap);
 
   document.getElementById('btn-debug-log').addEventListener('click', () => {
