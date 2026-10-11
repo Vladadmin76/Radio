@@ -226,8 +226,11 @@ html, body {
    kept subtle via size/color rather than via a gesture guess. The raw-metadata
    logging itself always runs in the background regardless. */
 .debug-log-wrap { width: 92%; max-width: 480px; margin: 10px auto 0; }
-#artist-photo-wrap { width: 100%; flex: 1; min-height: 40vh; }
-#artist-photo { width: 100%; height: 100%; object-fit: cover; display: none; }
+#artist-photo-wrap { width: 100%; display: flex; justify-content: center; margin-top: 16px; }
+#artist-photo {
+  width: 160px; height: 160px; object-fit: cover; display: none;
+  border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); border: 1px solid #a99;
+}
 #btn-debug-log {
   display: block; margin: 0 auto; background: none; border: none; color: #998f78;
   font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em;
@@ -347,7 +350,7 @@ const BTN = {"play": "assets/icons/play.webp", "stop": "assets/icons/stop.webp",
 const CASSETTE_IMG = "assets/cassette.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
