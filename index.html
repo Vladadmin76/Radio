@@ -642,16 +642,19 @@ async function updateArtistPhoto(artist) {
   img.style.display = 'none';
   try {
     const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(artist) + '&media=music&entity=song&limit=1');
-    if (!res.ok) return null;
+    if (!res.ok) { logDebugPhoto(artist, `HTTP ${res.status}`); return null; }
     const data = await res.json();
     const art = data.results && data.results[0] && data.results[0].artworkUrl100;
-    if (!art || artist !== lastPhotoArtist) return null;
+    if (!art) { logDebugPhoto(artist, `no match (resultCount=${data.resultCount})`); return null; }
+    if (artist !== lastPhotoArtist) return null;
     const bigArt = art.replace('100x100bb.jpg', '600x600bb.jpg');
     img.src = bigArt;
     img.style.display = 'block';
     img.dataset.url = bigArt;
+    logDebugPhoto(artist, `found: ${bigArt}`);
     return bigArt;
   } catch (e) {
+    logDebugPhoto(artist, `fetch failed: ${e.message}`);
     return null;
   }
 }
@@ -679,6 +682,16 @@ function logDebugRawTitle(station, raw) {
   const time = new Date().toLocaleTimeString();
   state.debugCounter++;
   state.debugLog.push({ n: state.debugCounter, time, station: station.name, raw, codes });
+  if (state.debugLog.length > DEBUG_LOG_MAX) state.debugLog.shift();
+  const counterEl = document.getElementById('debug-log-counter');
+  if (counterEl) counterEl.textContent = '№' + state.debugCounter;
+  renderDebugLog();
+}
+
+function logDebugPhoto(artist, message) {
+  const time = new Date().toLocaleTimeString();
+  state.debugCounter++;
+  state.debugLog.push({ n: state.debugCounter, time, station: 'PHOTO', raw: `artist="${artist}" ${message}`, codes: '' });
   if (state.debugLog.length > DEBUG_LOG_MAX) state.debugLog.shift();
   const counterEl = document.getElementById('debug-log-counter');
   if (counterEl) counterEl.textContent = '№' + state.debugCounter;
