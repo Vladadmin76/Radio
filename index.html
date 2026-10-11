@@ -214,23 +214,20 @@ html, body {
 }
 .transport-btn { width: 16%; cursor: pointer; flex-shrink: 0; }
 .transport-btn img { width: 100%; display: block; }
-/* Hidden by default — the raw-metadata logging still runs in the background either
-   way. Holding down on debug-reveal-zone for ~1.5s reveals the "ЛОГИ ТРЕКА"
-   button/panel for on-device diagnosis (see startRevealPress in the script). */
-.debug-log-wrap { display: none; width: 92%; max-width: 480px; margin: 18px auto 0; }
-#debug-reveal-zone { width: 100%; flex: 1; min-height: 50vh; position: relative; overflow: hidden; }
-/* Sits on top of the (invisible) long-press zone purely for display — pointer-events:
-   none lets taps/holds pass through to it underneath. */
-#artist-photo {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  pointer-events: none; display: none;
-}
+/* Small and low-key by design (not hidden) — a gesture-based reveal (multi-tap, then
+   long-press) proved unreliable across several attempts on a real device, so this is
+   just a normal, always-present, always-clickable button like any other in the app,
+   kept subtle via size/color rather than via a gesture guess. The raw-metadata
+   logging itself always runs in the background regardless. */
+.debug-log-wrap { width: 92%; max-width: 480px; margin: 10px auto 0; }
+#artist-photo-wrap { width: 100%; flex: 1; min-height: 40vh; }
+#artist-photo { width: 100%; height: 100%; object-fit: cover; display: none; }
 #btn-debug-log {
-  display: block; margin: 0 auto; background: none; border: none; color: #35312a;
-  font-family: 'Courier New', monospace; font-size: 17px; font-weight: bold; letter-spacing: 0.03em;
+  display: block; margin: 0 auto; background: none; border: none; color: #998f78;
+  font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em;
   text-decoration: underline; cursor: pointer; padding: 8px;
 }
-#debug-log-counter { text-decoration: none; color: #16337a; }
+#debug-log-counter { text-decoration: none; color: #7a8fb0; }
 .debug-log-panel { margin-top: 6px; }
 #debug-log-text {
   width: 100%; height: 160px; box-sizing: border-box; resize: vertical;
@@ -316,7 +313,7 @@ html, body {
           <span class="debug-log-copied" id="debug-log-copied" style="display:none;">Скопировано!</span>
         </div>
       </div>
-      <div id="debug-reveal-zone"><img id="artist-photo" draggable="false"></div>
+      <div id="artist-photo-wrap"><img id="artist-photo" draggable="false"></div>
     </div>
 
   </div>
@@ -975,25 +972,6 @@ function init() {
     if (!wrap.contains(e.target)) document.getElementById('cassette-quality-menu').classList.remove('open');
   });
 
-  // A long press (hold ~1.5s without lifting) is a single continuous touch, so it
-  // sidesteps iOS's rapid-repeated-tap gesture disambiguation entirely instead of
-  // trying to out-guess it.
-  const revealZone = document.getElementById('debug-reveal-zone');
-  let revealPressTimer = null;
-  const REVEAL_HOLD_MS = 1500;
-  const startRevealPress = e => {
-    e.preventDefault();
-    clearTimeout(revealPressTimer);
-    revealPressTimer = setTimeout(() => { document.querySelector('.debug-log-wrap').style.display = 'block'; }, REVEAL_HOLD_MS);
-  };
-  const cancelRevealPress = () => clearTimeout(revealPressTimer);
-  revealZone.addEventListener('touchstart', startRevealPress, { passive: false });
-  revealZone.addEventListener('touchend', cancelRevealPress);
-  revealZone.addEventListener('touchcancel', cancelRevealPress);
-  revealZone.addEventListener('touchmove', cancelRevealPress);
-  revealZone.addEventListener('mousedown', startRevealPress);
-  revealZone.addEventListener('mouseup', cancelRevealPress);
-  revealZone.addEventListener('mouseleave', cancelRevealPress);
 
   document.getElementById('btn-debug-log').addEventListener('click', () => {
     const panel = document.getElementById('debug-log-panel');
