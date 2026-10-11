@@ -347,7 +347,7 @@ const BTN = {"play": "assets/icons/play.webp", "stop": "assets/icons/stop.webp",
 const CASSETTE_IMG = "assets/cassette.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -633,10 +633,13 @@ function updateMediaSessionMetadata(station, streamTitle, artworkUrl) {
   });
 }
 
-// Looks up cover art for the current artist via the iTunes Search API (free, no key,
-// and — unlike most music APIs — actually allows direct browser fetches via CORS).
-// It's single/album artwork rather than a guaranteed artist portrait, but for most
-// pop tracks that's close enough, and there's no backend here to proxy a better source.
+// Looks up an actual photo of the artist via Wikipedia's free, no-key REST API
+// (CORS-enabled). iTunes Search was tried first but kept hitting HTTP 403 — it has
+// an undocumented per-IP rate limit — and only ever returns album art, not a
+// portrait anyway. Wikipedia gives a real photo when the artist has a page, at the
+// cost of patchier coverage for obscure/regional artists and a name-matching risk
+// (a same-named but different person's page). Two requests: search for the best-
+// matching page, then fetch that page's summary for its thumbnail image.
 let lastPhotoArtist = null;
 async function updateArtistPhoto(artist) {
   const img = document.getElementById('artist-photo');
@@ -651,18 +654,23 @@ async function updateArtistPhoto(artist) {
   lastPhotoArtist = artist;
   img.style.display = 'none';
   try {
-    const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(artist) + '&media=music&entity=song&limit=1');
-    if (!res.ok) { logDebugPhoto(artist, `HTTP ${res.status}`); return null; }
-    const data = await res.json();
-    const art = data.results && data.results[0] && data.results[0].artworkUrl100;
-    if (!art) { logDebugPhoto(artist, `no match (resultCount=${data.resultCount})`); return null; }
+    const searchRes = await fetch('https://en.wikipedia.org/w/rest.php/v1/search/page?q=' + encodeURIComponent(artist + ' singer') + '&limit=1');
+    if (!searchRes.ok) { logDebugPhoto(artist, `search HTTP ${searchRes.status}`); return null; }
+    const searchData = await searchRes.json();
+    const page = searchData.pages && searchData.pages[0];
+    if (!page) { logDebugPhoto(artist, 'no Wikipedia page found'); return null; }
     if (artist !== lastPhotoArtist) return null;
-    const bigArt = art.replace('100x100bb.jpg', '600x600bb.jpg');
-    img.src = bigArt;
+    const summaryRes = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(page.key));
+    if (!summaryRes.ok) { logDebugPhoto(artist, `summary HTTP ${summaryRes.status}`); return null; }
+    const summary = await summaryRes.json();
+    const thumb = summary.thumbnail && summary.thumbnail.source;
+    if (!thumb) { logDebugPhoto(artist, `page "${page.title}" has no photo`); return null; }
+    if (artist !== lastPhotoArtist) return null;
+    img.src = thumb;
     img.style.display = 'block';
-    img.dataset.url = bigArt;
-    logDebugPhoto(artist, `found: ${bigArt}`);
-    return bigArt;
+    img.dataset.url = thumb;
+    logDebugPhoto(artist, `found via "${page.title}": ${thumb}`);
+    return thumb;
   } catch (e) {
     logDebugPhoto(artist, `fetch failed: ${e.message}`);
     return null;
