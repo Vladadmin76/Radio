@@ -151,6 +151,12 @@ html, body {
 
 /* ---------- player screen ---------- */
 .player-screen { align-items: center; justify-content: flex-start; padding-top: 18px; }
+/* Build/PR number, so it's visible at a glance which version actually loaded on the
+   device — bump APP_VERSION in the script on every merge. */
+#app-version {
+  font-family: 'Courier New', monospace; font-size: 11px; color: #998f78;
+  margin-bottom: 4px;
+}
 .cassette-wrap {
   position: relative;
   width: 100%;
@@ -277,6 +283,7 @@ html, body {
 
     <!-- PLAYER SCREEN -->
     <div id="screen-player" class="screen player-screen" style="display:none;">
+      <div id="app-version"></div>
       <div class="cassette-wrap">
         <img class="cassette-bg" id="cassette-bg-img" draggable="false">
         <div class="cassette-genre" id="cassette-genre"></div>
@@ -338,6 +345,9 @@ const GENRES = {"rock": {"label": "Rock", "img": "assets/genres/rock.webp"}, "po
 const GENRE_ORDER = ["rock", "pop", "hip-hop", "rap", "randb", "soul", "funk", "disco", "dance", "house", "techno", "trance", "dnb", "dubstep", "electro", "edm", "ambient", "chill-out", "lo-fi", "trip-hop", "psybient", "psychedelic", "progressive", "hard-rock", "heavy-metal", "thrash-metal", "death-metal", "black-metal", "power-metal", "symphonic-metal", "gothic-metal", "alternative", "indie", "indie-rock", "post-rock", "grunge", "emo", "punk", "post-punk", "new-wave", "synthpop", "darkwave", "electropop", "new-age", "classical", "baroque", "romantic", "modern-classical", "choral", "opera", "jazz", "blues", "ragtime", "swing", "bebop", "smooth-jazz", "folk", "folk-rock", "country", "country-rock", "bluegrass", "outlaw-country", "americana", "cowboy", "celtic", "world", "afrobeat", "reggae", "dub", "dancehall", "ska", "rocksteady", "latin", "salsa", "merengue", "bachata", "tango", "flamenco", "bossa-nova", "samba", "forro", "zouk", "kizomba", "afro-cuban", "bhangra", "bollywood", "k-pop", "j-pop", "anison", "t-pop", "g-pop", "city-pop", "phonk", "vaporwave", "chiptune", "game-music", "soundtrack", "spoken-word", "acapella", "comedy", "podcast", "audiobook", "narration", "field-recording", "experimental"];     // [slug, ...] in sheet order
 const BTN = {"play": "assets/icons/play.webp", "stop": "assets/icons/stop.webp", "forward": "assets/icons/forward.webp", "back": "assets/icons/back.webp", "star_filled": "assets/icons/star_filled.webp", "star_empty": "assets/icons/star_empty.webp", "funnel": "assets/icons/funnel.webp"};            // { play, stop, forward, back, star_filled, star_empty, funnel }
 const CASSETTE_IMG = "assets/cassette.webp";
+// Shown above the cassette so it's obvious at a glance which version actually loaded
+// on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
+const APP_VERSION = 43;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -944,6 +954,7 @@ function attachSwipe(el, handlers) {
 
 /* ============ init ============ */
 function initStaticImages() {
+  document.getElementById('app-version').textContent = '№' + APP_VERSION;
   document.getElementById('cassette-bg-img').src = CASSETTE_IMG;
   document.getElementById('btn-fav-remove-img').src = BTN.star_empty;
   document.getElementById('btn-back-img').src = BTN.back;
