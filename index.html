@@ -154,8 +154,8 @@ html, body {
 /* Build/PR number, so it's visible at a glance which version actually loaded on the
    device — bump APP_VERSION in the script on every merge. */
 #app-version {
-  font-family: 'Courier New', monospace; font-size: 11px; color: #998f78;
-  margin-bottom: 4px;
+  font-family: 'Courier New', monospace; font-size: 20px; font-weight: bold; color: #35312a;
+  margin-bottom: 6px;
 }
 .cassette-wrap {
   position: relative;
@@ -347,7 +347,7 @@ const BTN = {"play": "assets/icons/play.webp", "stop": "assets/icons/stop.webp",
 const CASSETTE_IMG = "assets/cassette.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
