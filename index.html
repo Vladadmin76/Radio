@@ -417,7 +417,7 @@ const CASSETTE_IMG = "assets/cassette.webp";
 const REEL_HUB_IMG = "assets/cassette-reel-hub.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -633,13 +633,6 @@ function renderStationList() {
 
 /* ============ player ============ */
 const audioEl = new Audio();
-// Requested once, up front, so every station load (this attribute only takes effect
-// for a fetch that hasn't started yet) asks for CORS mode from the very first byte —
-// needed for the Web Audio equalizer below to ever get non-tainted data. It never
-// blocks ordinary playback: exactly like an <img crossorigin> pointed at a server
-// that sends no CORS headers, the resource still loads and plays fine, it's just
-// "tainted" for APIs (canvas, Web Audio) that would otherwise read its raw data.
-audioEl.crossOrigin = 'anonymous';
 
 if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('play', () => resumePlayback());
@@ -711,8 +704,8 @@ function updateMediaSessionMetadata(station, streamTitle, artworkUrl) {
 }
 
 // Persisted choice of what to show below the player's transport buttons: the
-// artist's photo, or one of 5 equalizer styles that visualize the actual playing
-// audio (loudness + frequency content) when the current station's stream allows it.
+// artist's photo, or one of 5 animated equalizer styles (purely decorative — there's
+// no reliable way to read real audio frequency data from a cross-origin radio stream).
 const SETTINGS_KEY = 'retroRadioSettings_v1';
 function loadSettings() {
   try {
@@ -727,81 +720,11 @@ function saveSettings() {
 }
 let appSettings = loadSettings();
 
-// Reads the real playing audio's frequency/amplitude via the Web Audio API so the
-// equalizer reflects actual loudness and pitch instead of a decorative random tick.
-// This only works when the station's stream server sends CORS headers
-// (Access-Control-Allow-Origin) — most Icecast/Shoutcast streams don't, since that
-// takes explicit server configuration the station operator usually never does.
-// Setting `crossOrigin` on the <audio> element never blocks playback itself (same
-// as an <img crossorigin> that still loads/displays fine without CORS headers) — a
-// non-CORS stream just leaves the analyser's data "tainted" (always all-zero), which
-// we detect per-tick and fall back to the old random-tick look for, station by
-// station. `createMediaElementSource` can only ever be called once per audio
-// element, so the connection is made lazily on first use and cached for the rest of
-// the page's life; once made it permanently routes this element's sound through the
-// Web Audio graph (wired straight back to speakers via `audioCtx.destination`),
-// which stays transparent across station switches since they all reuse this same
-// element (only `audioEl.src` changes).
-let audioCtx = null, analyserNode = null, audioSourceNode = null;
-let eqFreqData = null, eqTimeData = null;
-let audioAnalysisLive = null; // last logged true/false state, to avoid log spam
-
-function ensureAudioAnalysis() {
-  if (audioSourceNode) return !!analyserNode;
-  const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtxClass) return false;
-  try {
-    audioCtx = audioCtx || new AudioCtxClass();
-    audioSourceNode = audioCtx.createMediaElementSource(audioEl);
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 256;
-    analyserNode.smoothingTimeConstant = 0.6;
-    audioSourceNode.connect(analyserNode);
-    analyserNode.connect(audioCtx.destination);
-    eqFreqData = new Uint8Array(analyserNode.frequencyBinCount);
-    eqTimeData = new Uint8Array(analyserNode.fftSize);
-    return true;
-  } catch (e) {
-    logDebugAudio('setup failed: ' + e.message);
-    audioSourceNode = null;
-    analyserNode = null;
-    return false;
-  }
-}
-
-// Returns { freq, time, volume } from the real analyser, or null when analysis isn't
-// available or the current stream is CORS-silent — callers fall back to randomness.
-function getLiveAudioLevels() {
-  if (!ensureAudioAnalysis()) return null;
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  analyserNode.getByteFrequencyData(eqFreqData);
-  const sum = eqFreqData.reduce((a, b) => a + b, 0);
-  if (sum === 0) {
-    if (audioAnalysisLive !== false) { logDebugAudio('silent analyser data — stream likely lacks CORS headers, using decorative animation'); audioAnalysisLive = false; }
-    return null;
-  }
-  if (audioAnalysisLive !== true) { logDebugAudio('live frequency data detected — equalizer is audio-reactive'); audioAnalysisLive = true; }
-  analyserNode.getByteTimeDomainData(eqTimeData);
-  return { freq: eqFreqData, time: eqTimeData, volume: sum / eqFreqData.length / 255 };
-}
-
-// Averages consecutive analyser bins into `count` buckets so even a small bar/segment
-// count spans the whole spectrum (bass on the left, treble on the right).
-function sampleFrequencyBuckets(freq, count) {
-  const perBucket = Math.max(1, Math.floor(freq.length / count));
-  const out = [];
-  for (let i = 0; i < count; i++) {
-    let sum = 0, n = 0;
-    for (let j = i * perBucket; j < Math.min(freq.length, (i + 1) * perBucket); j++) { sum += freq[j]; n++; }
-    out.push(n ? sum / n : 0);
-  }
-  return out;
-}
-
-// Ticking (and the waveform's requestAnimationFrame loop) both pause whenever
-// playback isn't actually running (checked against the "playing" class); each tick
-// uses real audio levels when available, with a CSS transition smoothing the jump
-// when falling back to randomness so that still reads as "alive" rather than robotic.
+// All 5 equalizer styles are driven by a random JS tick (no real audio frequency data
+// is readable from a cross-origin radio stream), updated every 180ms with a CSS
+// transition smoothing each jump — that reads as "alive" rather than a robotically
+// looped pattern. Ticking, and the waveform's requestAnimationFrame loop, both pause
+// whenever playback isn't actually running (checked against the "playing" class).
 let eqWaveRAF = null;
 let eqWaveT = 0;
 let eqTickTimer = null;
@@ -813,25 +736,11 @@ function isPlaying() { return document.getElementById('screen-player').classList
 
 function startWaveformAnim(pathEl) {
   function draw() {
-    const live = isPlaying() ? getLiveAudioLevels() : null;
-    let d;
-    if (live) {
-      const time = live.time;
-      const step = Math.max(1, Math.floor(time.length / 35));
-      d = `M 0 ${(45 - ((time[0] - 128) / 128) * 40).toFixed(1)}`;
-      let x = 0;
-      for (let i = 0; i < time.length; i += step) {
-        const y = 45 - ((time[i] - 128) / 128) * 40;
-        d += ` L ${x} ${y.toFixed(1)}`;
-        x += 4;
-      }
-    } else {
-      if (isPlaying()) eqWaveT += 0.15;
-      d = 'M 0 45';
-      for (let x = 0; x <= 140; x += 4) {
-        const y = 45 + Math.sin(x * 0.15 + eqWaveT) * 25 * Math.sin(eqWaveT * 0.5 + x * 0.02);
-        d += ` L ${x} ${y.toFixed(1)}`;
-      }
+    if (isPlaying()) eqWaveT += 0.15;
+    let d = 'M 0 45';
+    for (let x = 0; x <= 140; x += 4) {
+      const y = 45 + Math.sin(x * 0.15 + eqWaveT) * 25 * Math.sin(eqWaveT * 0.5 + x * 0.02);
+      d += ` L ${x} ${y.toFixed(1)}`;
     }
     pathEl.setAttribute('d', d);
     eqWaveRAF = requestAnimationFrame(draw);
@@ -842,35 +751,21 @@ function startWaveformAnim(pathEl) {
 function tickEqualizer(style) {
   if (!isPlaying()) return;
   const box = document.getElementById('equalizer-box');
-  const live = getLiveAudioLevels();
   if (style === 1) {
-    const bars = box.querySelectorAll('.eq1 .bar');
-    const levels = live ? sampleFrequencyBuckets(live.freq, bars.length) : null;
-    bars.forEach((bar, i) => {
-      bar.style.height = (levels ? Math.max(6, (levels[i] / 255) * 100) : (12 + Math.random() * 82)) + '%';
-    });
+    box.querySelectorAll('.eq1 .bar').forEach(bar => { bar.style.height = (12 + Math.random() * 82) + '%'; });
   } else if (style === 2) {
-    const cols = box.querySelectorAll('.eq2 .col');
-    const levels = live ? sampleFrequencyBuckets(live.freq, cols.length) : null;
-    cols.forEach((col, i) => {
+    box.querySelectorAll('.eq2 .col').forEach(col => {
       const segs = col.children;
-      const lvl = levels ? Math.max(1, Math.round((levels[i] / 255) * segs.length)) : (1 + Math.floor(Math.random() * segs.length));
-      for (let s = 0; s < segs.length; s++) {
-        segs[s].className = 'seg' + (s < lvl ? ' on' + (s >= segs.length - 2 ? ' hi' : '') : '');
+      const lvl = 1 + Math.floor(Math.random() * segs.length);
+      for (let i = 0; i < segs.length; i++) {
+        segs[i].className = 'seg' + (i < lvl ? ' on' + (i >= segs.length - 2 ? ' hi' : '') : '');
       }
     });
   } else if (style === 3) {
-    const bars = box.querySelectorAll('.eq3 .rbar');
-    const levels = live ? sampleFrequencyBuckets(live.freq, bars.length) : null;
-    bars.forEach((bar, i) => {
-      bar.style.opacity = (levels ? Math.max(0.15, levels[i] / 255) : (0.2 + Math.random() * 0.8)).toFixed(2);
-    });
+    box.querySelectorAll('.eq3 .rbar').forEach(bar => { bar.style.opacity = (0.2 + Math.random() * 0.8).toFixed(2); });
   } else if (style === 5) {
     const needle = box.querySelector('.eq5 .needle');
-    if (needle) {
-      const level = live ? live.volume : Math.random();
-      needle.style.transform = `rotate(${(-35 + level * 60).toFixed(1)}deg)`;
-    }
+    if (needle) needle.style.transform = `rotate(${(-35 + Math.random() * 60).toFixed(1)}deg)`;
   }
 }
 function startEqualizerTicker(style) {
@@ -1045,16 +940,6 @@ function logDebugPhoto(artist, message) {
   const time = new Date().toLocaleTimeString();
   state.debugCounter++;
   state.debugLog.push({ n: state.debugCounter, time, station: 'PHOTO', raw: `artist="${artist}" ${message}`, codes: '' });
-  if (state.debugLog.length > DEBUG_LOG_MAX) state.debugLog.shift();
-  const counterEl = document.getElementById('debug-log-counter');
-  if (counterEl) counterEl.textContent = '№' + state.debugCounter;
-  renderDebugLog();
-}
-
-function logDebugAudio(message) {
-  const time = new Date().toLocaleTimeString();
-  state.debugCounter++;
-  state.debugLog.push({ n: state.debugCounter, time, station: 'AUDIO', raw: message, codes: '' });
   if (state.debugLog.length > DEBUG_LOG_MAX) state.debugLog.shift();
   const counterEl = document.getElementById('debug-log-counter');
   if (counterEl) counterEl.textContent = '№' + state.debugCounter;
