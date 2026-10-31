@@ -136,6 +136,12 @@ html, body {
   border-radius: 4px; cursor: pointer;
 }
 .filter-actions button.primary { background: #3a352c; color: #eae3d3; }
+.settings-section-title {
+  font-weight: bold; font-size: 12px; letter-spacing: 0.05em; color: #6b6150;
+  margin: 14px 0 4px; padding-top: 6px; border-top: 1px solid #d8d0ba;
+}
+.settings-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+#btn-settings { font-size: 18px; padding: 8px 12px; line-height: 1; }
 
 /* ---------- station list ---------- */
 .station-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 10px 20px; }
@@ -239,6 +245,42 @@ html, body {
   max-width: 100%; max-height: 45vh; width: auto; height: auto; object-fit: contain; display: none;
   border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); border: 1px solid #a99;
 }
+#equalizer-box {
+  width: 160px; height: 160px; display: none; align-items: center; justify-content: center;
+  border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); border: 1px solid #a99; background: #fbfaf5;
+}
+/* All equalizer animations stay frozen until playback is actually running. */
+.eq1 { display: flex; align-items: flex-end; gap: 6px; height: 70%; }
+.eq1 .bar { width: 10px; background: #1a3d8f; border-radius: 2px 2px 0 0; animation: eq1-bounce 1s ease-in-out infinite; animation-play-state: paused; }
+#screen-player.playing .eq1 .bar { animation-play-state: running; }
+.eq1 .bar:nth-child(1) { height: 30%; animation-delay: 0s; }
+.eq1 .bar:nth-child(2) { height: 70%; animation-delay: 0.1s; }
+.eq1 .bar:nth-child(3) { height: 45%; animation-delay: 0.2s; }
+.eq1 .bar:nth-child(4) { height: 85%; animation-delay: 0.3s; }
+.eq1 .bar:nth-child(5) { height: 55%; animation-delay: 0.15s; }
+@keyframes eq1-bounce { 0%,100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+
+.eq2 { display: flex; align-items: flex-end; gap: 5px; height: 70%; }
+.eq2 .col { display: flex; flex-direction: column-reverse; gap: 3px; width: 12px; animation: eq2-levels 1.1s ease-in-out infinite; animation-play-state: paused; }
+#screen-player.playing .eq2 .col { animation-play-state: running; }
+.eq2 .seg { width: 12px; height: 8px; background: #d8d0ba; border-radius: 1px; }
+.eq2 .seg.on { background: #1a3d8f; }
+.eq2 .seg.on.hi { background: #8f1a1a; }
+@keyframes eq2-levels { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+.eq3 svg { width: 120px; height: 120px; }
+.eq3 .rbar { animation: eq3-pulse 1.2s ease-in-out infinite; animation-play-state: paused; }
+#screen-player.playing .eq3 .rbar { animation-play-state: running; }
+@keyframes eq3-pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+.eq4 svg { width: 140px; height: 90px; }
+.eq4 path { fill: none; stroke: #1a3d8f; stroke-width: 3; stroke-linecap: round; }
+
+.eq5 { position: relative; width: 140px; height: 90px; }
+.eq5 svg { width: 100%; height: 100%; }
+.eq5 .needle { transform-origin: 70px 85px; animation: eq5-swing 1.4s ease-in-out infinite alternate; animation-play-state: paused; }
+#screen-player.playing .eq5 .needle { animation-play-state: running; }
+@keyframes eq5-swing { 0% { transform: rotate(-35deg); } 100% { transform: rotate(25deg); } }
 #btn-debug-log {
   display: block; margin: 0 auto; background: none; border: none; color: #998f78;
   font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em;
@@ -277,6 +319,7 @@ html, body {
       <div class="genre-toolbar">
         <button type="button" id="btn-language">LANGUAGE</button>
         <button type="button" id="btn-favorites">FAVORITES</button>
+        <button type="button" id="btn-settings" title="Settings">⚙</button>
         <input type="search" id="station-search" placeholder="Search station" autocomplete="off">
       </div>
       <div id="grid-scroll-genres" class="grid-scroll"></div>
@@ -333,7 +376,10 @@ html, body {
           <span class="debug-log-copied" id="debug-log-copied" style="display:none;">Скопировано!</span>
         </div>
       </div>
-      <div id="artist-photo-wrap"><img id="artist-photo" draggable="false"></div>
+      <div id="artist-photo-wrap">
+        <img id="artist-photo" draggable="false">
+        <div id="equalizer-box"></div>
+      </div>
     </div>
 
   </div>
@@ -350,6 +396,25 @@ html, body {
       <button class="primary" id="filter-apply">APPLY</button>
     </div>
   </div>
+
+  <!-- SETTINGS PANEL (overlay on genres screen) -->
+  <div class="filter-panel" id="settings-panel">
+    <div class="filter-head" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>SETTINGS</span>
+      <span id="settings-close" style="cursor:pointer;font-size:18px;">×</span>
+    </div>
+    <div class="filter-list">
+      <div class="settings-section-title">ПОД КНОПКАМИ ПОКАЗЫВАТЬ</div>
+      <label class="filter-item"><input type="radio" name="display-mode" value="artist"> Фото исполнителя</label>
+      <label class="filter-item"><input type="radio" name="display-mode" value="equalizer"> Эквалайзер</label>
+      <div class="settings-section-title">ВИД ЭКВАЛАЙЗЕРА</div>
+      <label class="filter-item"><input type="radio" name="eq-style" value="1"> 1. Столбики</label>
+      <label class="filter-item"><input type="radio" name="eq-style" value="2"> 2. Светодиодный уровень</label>
+      <label class="filter-item"><input type="radio" name="eq-style" value="3"> 3. Круговые столбики</label>
+      <label class="filter-item"><input type="radio" name="eq-style" value="4"> 4. Волна</label>
+      <label class="filter-item"><input type="radio" name="eq-style" value="5"> 5. Стрелка VU</label>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -361,7 +426,7 @@ const CASSETTE_IMG = "assets/cassette.webp";
 const REEL_HUB_IMG = "assets/cassette-reel-hub.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -647,6 +712,130 @@ function updateMediaSessionMetadata(station, streamTitle, artworkUrl) {
   });
 }
 
+// Persisted choice of what to show below the player's transport buttons: the
+// artist's photo, or one of 5 animated equalizer styles (purely decorative — there's
+// no reliable way to read real audio frequency data from a cross-origin radio stream).
+const SETTINGS_KEY = 'retroRadioSettings_v1';
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const s = raw ? JSON.parse(raw) : {};
+    const eqStyle = [1, 2, 3, 4, 5].includes(s.eqStyle) ? s.eqStyle : 1;
+    return { displayMode: s.displayMode === 'equalizer' ? 'equalizer' : 'artist', eqStyle };
+  } catch (e) { return { displayMode: 'artist', eqStyle: 1 }; }
+}
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings)); } catch (e) {}
+}
+let appSettings = loadSettings();
+
+let eqWaveRAF = null;
+let eqWaveT = 0;
+function stopEqualizerAnim() {
+  if (eqWaveRAF) { cancelAnimationFrame(eqWaveRAF); eqWaveRAF = null; }
+}
+function startWaveformAnim(pathEl) {
+  function draw() {
+    if (document.getElementById('screen-player').classList.contains('playing')) eqWaveT += 0.15;
+    let d = 'M 0 45';
+    for (let x = 0; x <= 140; x += 4) {
+      const y = 45 + Math.sin(x * 0.15 + eqWaveT) * 25 * Math.sin(eqWaveT * 0.5 + x * 0.02);
+      d += ` L ${x} ${y.toFixed(1)}`;
+    }
+    pathEl.setAttribute('d', d);
+    eqWaveRAF = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function renderEqualizer(style) {
+  const box = document.getElementById('equalizer-box');
+  stopEqualizerAnim();
+  box.innerHTML = '';
+  if (style === 1) {
+    const wrap = document.createElement('div');
+    wrap.className = 'eq1';
+    for (let i = 0; i < 5; i++) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'bar' }));
+    box.appendChild(wrap);
+  } else if (style === 2) {
+    const wrap = document.createElement('div');
+    wrap.className = 'eq2';
+    [3, 6, 4, 7, 5].forEach(lvl => {
+      const col = document.createElement('div');
+      col.className = 'col';
+      for (let s = 0; s < 8; s++) {
+        const seg = document.createElement('div');
+        seg.className = 'seg' + (s < lvl ? ' on' + (s >= 6 ? ' hi' : '') : '');
+        col.appendChild(seg);
+      }
+      wrap.appendChild(col);
+    });
+    box.appendChild(wrap);
+  } else if (style === 3) {
+    const wrap = document.createElement('div');
+    wrap.className = 'eq3';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 120 120');
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', 60); circle.setAttribute('cy', 60); circle.setAttribute('r', 18);
+    circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', '#c9c0a8'); circle.setAttribute('stroke-width', 1);
+    svg.appendChild(circle);
+    for (let i = 0; i < 12; i++) {
+      const bar = document.createElementNS(SVG_NS, 'rect');
+      bar.setAttribute('x', 58); bar.setAttribute('y', 10); bar.setAttribute('width', 4); bar.setAttribute('height', 14);
+      bar.setAttribute('rx', 2); bar.setAttribute('fill', '#1a3d8f'); bar.setAttribute('class', 'rbar');
+      bar.setAttribute('transform', `rotate(${(360 / 12) * i} 60 60)`);
+      bar.style.animationDelay = (i * 0.07) + 's';
+      svg.appendChild(bar);
+    }
+    wrap.appendChild(svg);
+    box.appendChild(wrap);
+  } else if (style === 4) {
+    const wrap = document.createElement('div');
+    wrap.className = 'eq4';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 140 90');
+    const path = document.createElementNS(SVG_NS, 'path');
+    svg.appendChild(path);
+    wrap.appendChild(svg);
+    box.appendChild(wrap);
+    startWaveformAnim(path);
+  } else if (style === 5) {
+    const wrap = document.createElement('div');
+    wrap.className = 'eq5';
+    wrap.innerHTML = '<svg viewBox="0 0 140 90">'
+      + '<path d="M 10 85 A 60 60 0 0 1 130 85" fill="none" stroke="#a99" stroke-width="2"/>'
+      + '<text x="15" y="78" font-size="8" fill="#6b6150">-</text>'
+      + '<text x="118" y="78" font-size="8" fill="#6b6150">+</text>'
+      + '<g class="needle"><line x1="70" y1="85" x2="70" y2="20" stroke="#8f1a1a" stroke-width="2"/></g>'
+      + '<circle cx="70" cy="85" r="4" fill="#35312a"/></svg>';
+    box.appendChild(wrap);
+  }
+}
+
+function applyDisplayMode() {
+  const img = document.getElementById('artist-photo');
+  const eqBox = document.getElementById('equalizer-box');
+  if (appSettings.displayMode === 'equalizer') {
+    img.style.display = 'none';
+    eqBox.style.display = 'flex';
+    renderEqualizer(appSettings.eqStyle);
+  } else {
+    eqBox.style.display = 'none';
+    stopEqualizerAnim();
+    eqBox.innerHTML = '';
+    img.style.display = img.dataset.url ? 'block' : 'none';
+  }
+}
+
+function openSettings() {
+  document.querySelector(`input[name="display-mode"][value="${appSettings.displayMode}"]`).checked = true;
+  document.querySelector(`input[name="eq-style"][value="${appSettings.eqStyle}"]`).checked = true;
+  document.getElementById('settings-panel').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-panel').classList.remove('open'); }
+
 // Looks up an actual photo of the artist via Wikipedia's free, no-key REST API
 // (CORS-enabled). iTunes Search was tried first but kept hitting HTTP 403 — it has
 // an undocumented per-IP rate limit — and only ever returns album art, not a
@@ -662,11 +851,13 @@ async function updateArtistPhoto(artist) {
     lastPhotoArtist = null;
     img.style.display = 'none';
     img.src = '';
+    delete img.dataset.url;
     return null;
   }
   if (artist === lastPhotoArtist) return img.dataset.url || null;
   lastPhotoArtist = artist;
   img.style.display = 'none';
+  delete img.dataset.url;
   try {
     const searchRes = await fetch('https://en.wikipedia.org/w/rest.php/v1/search/page?q=' + encodeURIComponent(artist + ' singer') + '&limit=1');
     if (!searchRes.ok) { logDebugPhoto(artist, `search HTTP ${searchRes.status}`); return null; }
@@ -681,8 +872,8 @@ async function updateArtistPhoto(artist) {
     if (!thumb) { logDebugPhoto(artist, `page "${page.title}" has no photo`); return null; }
     if (artist !== lastPhotoArtist) return null;
     img.src = thumb;
-    img.style.display = 'block';
     img.dataset.url = thumb;
+    applyDisplayMode();
     logDebugPhoto(artist, `found via "${page.title}": ${thumb}`);
     return thumb;
   } catch (e) {
@@ -1000,6 +1191,19 @@ function init() {
   document.getElementById('back-from-list').addEventListener('click', exitList);
   document.getElementById('btn-language').addEventListener('click', openFilter);
   document.getElementById('btn-favorites').addEventListener('click', openFavoritesList);
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('settings-close').addEventListener('click', closeSettings);
+  document.querySelectorAll('input[name="display-mode"]').forEach(r => r.addEventListener('change', e => {
+    appSettings.displayMode = e.target.value;
+    saveSettings();
+    applyDisplayMode();
+  }));
+  document.querySelectorAll('input[name="eq-style"]').forEach(r => r.addEventListener('change', e => {
+    appSettings.eqStyle = parseInt(e.target.value, 10);
+    saveSettings();
+    applyDisplayMode();
+  }));
+  applyDisplayMode();
   document.getElementById('now-playing-bar').addEventListener('click', () => goToScreen('player'));
   document.getElementById('station-search').addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
