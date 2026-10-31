@@ -417,7 +417,7 @@ const CASSETTE_IMG = "assets/cassette.webp";
 const REEL_HUB_IMG = "assets/cassette-reel-hub.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -747,19 +747,52 @@ const GENRE_BPM = {
   classical: 76, instrumental: 84, piano: 80,
   country: 100, folk: 95, acoustic: 92,
   talk: 60, news: 58, speech: 58,
+  // Russian-language tags — radio-browser's catalog has plenty of these, and none of
+  // the English keywords above ever match them (confirmed against real stations:
+  // "музыка", "hit" and "audiobook" tags all fell through to one identical default).
+  'поп': 112, 'рок': 118, 'метал': 140, 'панк': 165, 'инди': 110,
+  'джаз': 90, 'блюз': 80, 'диско': 118, 'соул': 95, 'фанк': 108,
+  'шансон': 92, 'ретро': 100, 'лаунж': 90, 'чилл': 85, 'эмбиент': 70,
+  'электроника': 126, 'техно': 130, 'транс': 136, 'дабстеп': 140,
+  'рэп': 95, 'хип-хоп': 95, 'хипхоп': 95,
+  'классика': 76, 'фолк': 95, 'кантри': 100, 'акустика': 92,
+  'реггей': 80, 'латина': 100, 'сальса': 180,
 };
-const DEFAULT_BPM = 104;
+// Genres with no real musical pulse at all — for these the equalizer shouldn't fake
+// a beat (confirmed against a real station: "Радио Фантастики" tagged "audiobook" is
+// literally a book being read aloud, there's no rhythm in it to synthesize honestly).
+const SPOKEN_WORD_KEYWORDS = [
+  'talk', 'news', 'speech', 'audiobook', 'audio book', 'podcast',
+  'аудиокниг', 'подкаст', 'новости', 'разговор', 'ток-шоу', 'радиоспектакль',
+];
+function isSpokenWordStation(station) {
+  const tags = ((station && station.tags) || '').toLowerCase();
+  return SPOKEN_WORD_KEYWORDS.some(k => tags.includes(k));
+}
+// Many stations carry only a generic tag ("музыка"/"music", "hit", or nothing at all)
+// that signals no real genre. Rather than collapsing all of those into one identical
+// fallback BPM (which read as "the equalizer doesn't react to the station at all" —
+// confirmed on a real device across 3 differently-tagged stations), derive a BPM
+// deterministically from the station's own name/id, so at least different untagged
+// stations still feel different from each other instead of all converging on one value.
+function hashStr(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 function guessStationBpm(station) {
   const tags = ((station && station.tags) || '').toLowerCase();
   for (const key in GENRE_BPM) {
     if (tags.includes(key)) return GENRE_BPM[key];
   }
-  return DEFAULT_BPM;
+  const seed = (station && (station.stationuuid || station.name)) || 'x';
+  return 96 + (hashStr(String(seed)) % 27); // deterministic per station, 96..122bpm
 }
 
 let beatState = null;
 function resetBeatEngine(station) {
-  beatState = { bpm: guessStationBpm(station), startTime: performance.now(), seed: Math.random() * 1000, trackChangeAt: null };
+  const spokenWord = isSpokenWordStation(station);
+  beatState = { bpm: spokenWord ? 60 : guessStationBpm(station), spokenWord, startTime: performance.now(), seed: Math.random() * 1000, trackChangeAt: null };
 }
 function onBeatTrackChange() {
   if (beatState) beatState.trackChangeAt = performance.now();
@@ -776,10 +809,13 @@ function sampleBeatBands() {
   const highPulse = Math.exp(-subPhase * 8);
   const phraseEnv = 0.55 + 0.45 * Math.sin(phrasePos * Math.PI * 2 + beatState.seed);
   const slowDrift = 0.5 + 0.5 * Math.sin(now * 0.00037 + beatState.seed * 2);
+  // Spoken-word stations get a gentle ambient "breathing" motion (from the mid band
+  // alone) instead of a musical kick/hat pulse — there's no beat to fake honestly.
+  const beatAmp = beatState.spokenWord ? 0.25 : 1;
 
-  let low = 0.22 + 0.68 * lowPulse;
+  let low = 0.22 + 0.68 * lowPulse * beatAmp;
   let mid = 0.2 + 0.55 * phraseEnv * (0.7 + 0.3 * slowDrift);
-  let high = 0.15 + 0.55 * highPulse + 0.1 * slowDrift;
+  let high = 0.15 + 0.55 * highPulse * beatAmp + 0.1 * slowDrift;
 
   if (beatState.trackChangeAt) {
     const dt = now - beatState.trackChangeAt;
