@@ -417,7 +417,7 @@ const CASSETTE_IMG = "assets/cassette.webp";
 const REEL_HUB_IMG = "assets/cassette-reel-hub.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -704,8 +704,10 @@ function updateMediaSessionMetadata(station, streamTitle, artworkUrl) {
 }
 
 // Persisted choice of what to show below the player's transport buttons: the
-// artist's photo, or one of 5 animated equalizer styles (purely decorative — there's
-// no reliable way to read real audio frequency data from a cross-origin radio stream).
+// artist's photo, or one of 5 animated equalizer styles. There's no reliable way to
+// read real audio frequency data from a cross-origin radio stream in a browser (see
+// the "beat engine" comment below for why) — these styles instead synthesize a
+// believable rhythmic pulse from what we *do* know about the current station.
 const SETTINGS_KEY = 'retroRadioSettings_v1';
 function loadSettings() {
   try {
@@ -720,11 +722,84 @@ function saveSettings() {
 }
 let appSettings = loadSettings();
 
-// All 5 equalizer styles are driven by a random JS tick (no real audio frequency data
-// is readable from a cross-origin radio stream), updated every 180ms with a CSS
-// transition smoothing each jump — that reads as "alive" rather than a robotically
-// looped pattern. Ticking, and the waveform's requestAnimationFrame loop, both pause
-// whenever playback isn't actually running (checked against the "playing" class).
+// "Beat engine": synthesizes a believable rhythmic pulse instead of raw per-frame
+// randomness. A real per-station FFT isn't available without a proxy server (reading
+// frequency data from a cross-origin <audio> via Web Audio's AnalyserNode requires
+// crossOrigin="anonymous", and setting that breaks playback outright on any stream
+// whose server doesn't send CORS headers — confirmed on a real device, see git log).
+// What we *do* have, with zero risk to playback: the station's genre (picks a
+// plausible BPM), and real player events (playing/pause/stalled, track changes).
+// A beat clock built from those produces three "bands" — low/mid/high — each tick:
+//  - low:  a fast-attack, exponential-decay pulse once per beat (like a kick drum).
+//  - high: the same pulse but twice as fast and quieter (like a hi-hat on the offbeat).
+//  - mid:  a slower envelope across an 8-beat phrase (like a verse building energy),
+//          so the whole thing doesn't just repeat identically beat after beat.
+// Every style smooths its rendered values toward the new target each tick instead of
+// jumping straight to it, which is what actually reads as "alive" rather than noisy.
+const GENRE_BPM = {
+  techno: 130, trance: 136, house: 124, edm: 128, electronic: 126, dance: 126,
+  dubstep: 140, 'drum and bass': 172, dnb: 172, jungle: 172,
+  punk: 165, metal: 140, rock: 118, pop: 112, indie: 110,
+  trap: 140, 'hip hop': 95, hiphop: 95, rap: 95, grime: 140,
+  funk: 108, disco: 118, soul: 95, 'r&b': 90, randb: 90,
+  salsa: 180, latin: 100, reggaeton: 96, reggae: 80,
+  jazz: 90, blues: 80, lounge: 90, chill: 85, chillout: 85, ambient: 70,
+  classical: 76, instrumental: 84, piano: 80,
+  country: 100, folk: 95, acoustic: 92,
+  talk: 60, news: 58, speech: 58,
+};
+const DEFAULT_BPM = 104;
+function guessStationBpm(station) {
+  const tags = ((station && station.tags) || '').toLowerCase();
+  for (const key in GENRE_BPM) {
+    if (tags.includes(key)) return GENRE_BPM[key];
+  }
+  return DEFAULT_BPM;
+}
+
+let beatState = null;
+function resetBeatEngine(station) {
+  beatState = { bpm: guessStationBpm(station), startTime: performance.now(), seed: Math.random() * 1000, trackChangeAt: null };
+}
+function onBeatTrackChange() {
+  if (beatState) beatState.trackChangeAt = performance.now();
+}
+function sampleBeatBands() {
+  if (!beatState) return { low: 0.2, mid: 0.2, high: 0.2, overall: 0.2 };
+  const now = performance.now();
+  const beatMs = 60000 / beatState.bpm;
+  const elapsedBeats = (now - beatState.startTime) / beatMs;
+  const beatPhase = elapsedBeats % 1;
+  const subPhase = (elapsedBeats * 2) % 1;
+  const phrasePos = (elapsedBeats % 8) / 8;
+  const lowPulse = Math.exp(-beatPhase * 6);
+  const highPulse = Math.exp(-subPhase * 8);
+  const phraseEnv = 0.55 + 0.45 * Math.sin(phrasePos * Math.PI * 2 + beatState.seed);
+  const slowDrift = 0.5 + 0.5 * Math.sin(now * 0.00037 + beatState.seed * 2);
+
+  let low = 0.22 + 0.68 * lowPulse;
+  let mid = 0.2 + 0.55 * phraseEnv * (0.7 + 0.3 * slowDrift);
+  let high = 0.15 + 0.55 * highPulse + 0.1 * slowDrift;
+
+  if (beatState.trackChangeAt) {
+    const dt = now - beatState.trackChangeAt;
+    if (dt < 500) { const k = 0.15 + 0.85 * (dt / 500); low *= k; mid *= k; high *= k; }
+    else beatState.trackChangeAt = null;
+  }
+  low = Math.min(1, Math.max(0, low));
+  mid = Math.min(1, Math.max(0, mid));
+  high = Math.min(1, Math.max(0, high));
+  return { low, mid, high, overall: low * 0.5 + mid * 0.3 + high * 0.2 };
+}
+// Triangular cross-fade so a bar/column's position (0 = bass side .. 1 = treble
+// side) blends smoothly between bands instead of jumping between hard buckets.
+function bandWeightAt(pos) {
+  const low = Math.max(0, 1 - pos * 2);
+  const high = Math.max(0, pos * 2 - 1);
+  return { low, mid: Math.max(0, 1 - low - high), high };
+}
+function smoothTowards(prev, target, k) { return prev + (target - prev) * k; }
+
 let eqWaveRAF = null;
 let eqWaveT = 0;
 let eqTickTimer = null;
@@ -736,13 +811,20 @@ function isPlaying() { return document.getElementById('screen-player').classList
 
 function startWaveformAnim(pathEl) {
   function draw() {
-    if (isPlaying()) eqWaveT += 0.15;
-    let d = 'M 0 45';
-    for (let x = 0; x <= 140; x += 4) {
-      const y = 45 + Math.sin(x * 0.15 + eqWaveT) * 25 * Math.sin(eqWaveT * 0.5 + x * 0.02);
-      d += ` L ${x} ${y.toFixed(1)}`;
+    if (isPlaying()) {
+      eqWaveT += 0.045;
+      const b = sampleBeatBands();
+      let d = '';
+      for (let x = 0; x <= 140; x += 4) {
+        const xn = x / 140;
+        const y = 45
+          - Math.sin(xn * 12.6 + eqWaveT * 2.0) * 18 * b.low
+          - Math.sin(xn * 28.3 + eqWaveT * 3.3) * 10 * b.mid
+          - Math.sin(xn * 53.4 + eqWaveT * 5.1) * 6 * b.high;
+        d += (x === 0 ? 'M 0 ' : ` L ${x} `) + y.toFixed(1);
+      }
+      pathEl.setAttribute('d', d);
     }
-    pathEl.setAttribute('d', d);
     eqWaveRAF = requestAnimationFrame(draw);
   }
   draw();
@@ -751,25 +833,54 @@ function startWaveformAnim(pathEl) {
 function tickEqualizer(style) {
   if (!isPlaying()) return;
   const box = document.getElementById('equalizer-box');
+  const b = sampleBeatBands();
   if (style === 1) {
-    box.querySelectorAll('.eq1 .bar').forEach(bar => { bar.style.height = (12 + Math.random() * 82) + '%'; });
+    const bars = box.querySelectorAll('.eq1 .bar');
+    bars.forEach((bar, i) => {
+      const w = bandWeightAt(bars.length > 1 ? i / (bars.length - 1) : 0.5);
+      const target = (b.low * w.low + b.mid * w.mid + b.high * w.high) * 100;
+      const prev = parseFloat(bar.style.height) || 20;
+      bar.style.height = smoothTowards(prev, Math.max(6, target), 0.4).toFixed(1) + '%';
+    });
   } else if (style === 2) {
-    box.querySelectorAll('.eq2 .col').forEach(col => {
+    const cols = box.querySelectorAll('.eq2 .col');
+    cols.forEach((col, i) => {
+      const w = bandWeightAt(cols.length > 1 ? i / (cols.length - 1) : 0.5);
+      const target = b.low * w.low + b.mid * w.mid + b.high * w.high;
+      const prev = parseFloat(col.dataset.level || '0.25');
+      const next = smoothTowards(prev, target, 0.45);
+      col.dataset.level = next;
       const segs = col.children;
-      const lvl = 1 + Math.floor(Math.random() * segs.length);
-      for (let i = 0; i < segs.length; i++) {
-        segs[i].className = 'seg' + (i < lvl ? ' on' + (i >= segs.length - 2 ? ' hi' : '') : '');
+      const lvl = Math.max(1, Math.round(next * segs.length));
+      for (let s = 0; s < segs.length; s++) {
+        segs[s].className = 'seg' + (s < lvl ? ' on' + (s >= segs.length - 2 ? ' hi' : '') : '');
       }
     });
   } else if (style === 3) {
-    box.querySelectorAll('.eq3 .rbar').forEach(bar => { bar.style.opacity = (0.2 + Math.random() * 0.8).toFixed(2); });
+    const bars = box.querySelectorAll('.eq3 .rbar');
+    const now = performance.now();
+    bars.forEach((bar, i) => {
+      const angle = (i / bars.length) * Math.PI * 2;
+      const sweep = 0.5 + 0.5 * Math.sin(angle * 2 + now * 0.0015);
+      const target = Math.max(0.15, Math.min(1, b.overall * (0.7 + 0.7 * sweep)));
+      const prev = parseFloat(bar.dataset.level || '0.3');
+      const next = smoothTowards(prev, target, 0.4);
+      bar.dataset.level = next;
+      bar.style.opacity = next.toFixed(2);
+    });
   } else if (style === 5) {
     const needle = box.querySelector('.eq5 .needle');
-    if (needle) needle.style.transform = `rotate(${(-35 + Math.random() * 60).toFixed(1)}deg)`;
+    if (needle) {
+      const prevDeg = parseFloat(needle.dataset.deg || '-35');
+      const next = smoothTowards(prevDeg, -35 + b.overall * 60, 0.18);
+      needle.dataset.deg = next;
+      needle.style.transform = `rotate(${next.toFixed(1)}deg)`;
+    }
   }
 }
 function startEqualizerTicker(style) {
   stopEqualizerAnim();
+  if (!beatState) resetBeatEngine(state.player && state.player.station);
   tickEqualizer(style);
   eqTickTimer = setInterval(() => tickEqualizer(style), 180);
 }
@@ -907,7 +1018,13 @@ async function updateArtistPhoto(artist) {
   }
 }
 
+let lastBeatTrackKey = null;
 function updateNowPlayingDisplay(station, streamTitle) {
+  const trackKey = station.name + '|' + streamTitle;
+  if (trackKey !== lastBeatTrackKey) {
+    if (lastBeatTrackKey !== null) onBeatTrackChange();
+    lastBeatTrackKey = trackKey;
+  }
   const split = splitStreamTitle(streamTitle);
   const artistEl = document.getElementById('cassette-np-artist');
   const titleEl = document.getElementById('cassette-np-title');
@@ -1058,6 +1175,7 @@ function playStation(station) {
   audioEl.load();
   audioEl.play().catch(() => {});
   updatePlayPauseIcon();
+  resetBeatEngine(station);
   updateNowPlayingDisplay(station, '');
   startMetaPoll();
   updateNowPlayingBar();
