@@ -169,6 +169,14 @@ html, body {
   border-radius: 3px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 .cassette-genre img { width: 100%; display:block; }
+.reel-hub {
+  position: absolute; width: 9.474%; height: 17.746%;
+  animation: reel-spin 3s linear infinite; animation-play-state: paused;
+}
+.reel-hub-left { left: 22.632%; top: 35.352%; }
+.reel-hub-right { left: 69.549%; top: 35.493%; }
+#screen-player.playing .reel-hub { animation-play-state: running; }
+@keyframes reel-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .cassette-title {
   position: absolute; left: 8%; top: 11%; width: 84%; text-align: center;
   font-size: clamp(13.5px, 3.9vw, 19.5px); font-weight: bold;
@@ -289,6 +297,8 @@ html, body {
       <div id="app-version"></div>
       <div class="cassette-wrap">
         <img class="cassette-bg" id="cassette-bg-img" draggable="false">
+        <img class="reel-hub reel-hub-left" id="reel-hub-left" draggable="false">
+        <img class="reel-hub reel-hub-right" id="reel-hub-right" draggable="false">
         <div class="cassette-genre" id="cassette-genre"></div>
         <div class="cassette-title" id="cassette-title"></div>
         <div class="cassette-nowplaying" id="cassette-np-artist"></div>
@@ -348,9 +358,10 @@ const GENRES = {"rock": {"label": "Rock", "img": "assets/genres/rock.webp"}, "po
 const GENRE_ORDER = ["rock", "pop", "hip-hop", "rap", "randb", "soul", "funk", "disco", "dance", "house", "techno", "trance", "dnb", "dubstep", "electro", "edm", "ambient", "chill-out", "lo-fi", "trip-hop", "psybient", "psychedelic", "progressive", "hard-rock", "heavy-metal", "thrash-metal", "death-metal", "black-metal", "power-metal", "symphonic-metal", "gothic-metal", "alternative", "indie", "indie-rock", "post-rock", "grunge", "emo", "punk", "post-punk", "new-wave", "synthpop", "darkwave", "electropop", "new-age", "classical", "baroque", "romantic", "modern-classical", "choral", "opera", "jazz", "blues", "ragtime", "swing", "bebop", "smooth-jazz", "folk", "folk-rock", "country", "country-rock", "bluegrass", "outlaw-country", "americana", "cowboy", "celtic", "world", "afrobeat", "reggae", "dub", "dancehall", "ska", "rocksteady", "latin", "salsa", "merengue", "bachata", "tango", "flamenco", "bossa-nova", "samba", "forro", "zouk", "kizomba", "afro-cuban", "bhangra", "bollywood", "k-pop", "j-pop", "anison", "t-pop", "g-pop", "city-pop", "phonk", "vaporwave", "chiptune", "game-music", "soundtrack", "spoken-word", "acapella", "comedy", "podcast", "audiobook", "narration", "field-recording", "experimental"];     // [slug, ...] in sheet order
 const BTN = {"play": "assets/icons/play.webp", "stop": "assets/icons/stop.webp", "forward": "assets/icons/forward.webp", "back": "assets/icons/back.webp", "star_filled": "assets/icons/star_filled.webp", "star_empty": "assets/icons/star_empty.webp", "funnel": "assets/icons/funnel.webp"};            // { play, stop, forward, back, star_filled, star_empty, funnel }
 const CASSETTE_IMG = "assets/cassette.webp";
+const REEL_HUB_IMG = "assets/cassette-reel-hub.webp";
 // Shown above the cassette so it's obvious at a glance which version actually loaded
 // on the device (vs. a stale cached copy) — bump this on every merge to GitHub.
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 const GENRE_ALIASES = {"randb": ["rnb", "rhythmandblues"], "dnb": ["drumandbass", "drumnbass", "jungle"], "lo-fi": ["lofi", "lofihiphop"], "hip-hop": ["hiphop", "rap"], "chill-out": ["chillout", "chill"], "trip-hop": ["triphop"], "k-pop": ["kpop"], "j-pop": ["jpop"], "t-pop": ["tpop"], "g-pop": ["gpop"], "anison": ["animesong", "anime"], "world": ["worldmusic"], "edm": ["electronicdancemusic"]}; // { slug: [extra normalized keywords] }
 
 // Catch-all genre for stations whose tags don't match any genre above, so no station is ever hidden entirely.
@@ -841,8 +852,13 @@ audioEl.addEventListener('playing', () => {
   clearTimeout(state.stallGraceTimer);
   state.stallGraceTimer = null;
   updatePlayPauseIcon();
+  document.getElementById('screen-player').classList.add('playing');
 });
-audioEl.addEventListener('pause', () => { updatePlayPauseIcon(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; });
+audioEl.addEventListener('pause', () => {
+  updatePlayPauseIcon();
+  document.getElementById('screen-player').classList.remove('playing');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+});
 audioEl.addEventListener('play', () => { updatePlayPauseIcon(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
 audioEl.addEventListener('error', silentReconnect);
 audioEl.addEventListener('stalled', () => {
@@ -967,6 +983,8 @@ function attachSwipe(el, handlers) {
 function initStaticImages() {
   document.getElementById('app-version').textContent = '№' + APP_VERSION;
   document.getElementById('cassette-bg-img').src = CASSETTE_IMG;
+  document.getElementById('reel-hub-left').src = REEL_HUB_IMG;
+  document.getElementById('reel-hub-right').src = REEL_HUB_IMG;
   document.getElementById('btn-fav-remove-img').src = BTN.star_empty;
   document.getElementById('btn-back-img').src = BTN.back;
   document.getElementById('btn-forward-img').src = BTN.forward;
